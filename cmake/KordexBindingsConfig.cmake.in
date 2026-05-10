@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(kordex_runtime CONFIG REQUIRED)
+find_dependency(vix_error CONFIG REQUIRED)
+find_dependency(vix_log CONFIG REQUIRED)
+find_dependency(vix_json CONFIG REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/kordex_bindingsTargets.cmake")
+
+check_required_components(kordex_bindings)
