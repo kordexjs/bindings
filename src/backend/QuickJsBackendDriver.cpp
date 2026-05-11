@@ -56,6 +56,62 @@ namespace kordex::bindings
       return result;
     }
 
+    [[nodiscard]] Result<std::string> quickjs_value_to_string(
+        JSContext *context,
+        JSValue value)
+    {
+      const char *text = JS_ToCString(context, value);
+      if (!text)
+      {
+        return make_binding_error(
+            BindingErrorCode::ValueConversionFailed,
+            quickjs_exception_message(context));
+      }
+
+      std::string result(text);
+      JS_FreeCString(context, text);
+
+      return result;
+    }
+
+    [[nodiscard]] Result<std::string> quickjs_object_to_json_or_string(
+        JSContext *context,
+        JSValue value)
+    {
+      JSValue json = JS_JSONStringify(
+          context,
+          value,
+          JS_UNDEFINED,
+          JS_UNDEFINED);
+
+      if (!JS_IsException(json) && !JS_IsUndefined(json))
+      {
+        auto text = quickjs_value_to_string(context, json);
+        JS_FreeValue(context, json);
+
+        if (!text)
+        {
+          return text.error();
+        }
+
+        return text.value();
+      }
+
+      if (JS_IsException(json))
+      {
+        JS_FreeValue(context, json);
+
+        JSValue exception = JS_GetException(context);
+        JS_FreeValue(context, exception);
+      }
+      else
+      {
+        JS_FreeValue(context, json);
+      }
+
+      return quickjs_value_to_string(context, value);
+    }
+
     [[nodiscard]] Result<Value> quickjs_value_to_binding_value(
         JSContext *context,
         JSValue value)
@@ -91,30 +147,33 @@ namespace kordex::bindings
 
       if (JS_IsString(value))
       {
-        const char *text = JS_ToCString(context, value);
+        auto text = quickjs_value_to_string(context, value);
         if (!text)
         {
-          return make_binding_error(
-              BindingErrorCode::ValueConversionFailed,
-              quickjs_exception_message(context));
+          return text.error();
         }
 
-        std::string result(text);
-        JS_FreeCString(context, text);
-
-        return Value::string(std::move(result));
+        return Value::string(text.value());
       }
 
-      const char *text = JS_ToCString(context, value);
+      if (JS_IsObject(value))
+      {
+        auto text = quickjs_object_to_json_or_string(context, value);
+        if (!text)
+        {
+          return text.error();
+        }
+
+        return Value::string(text.value());
+      }
+
+      auto text = quickjs_value_to_string(context, value);
       if (!text)
       {
-        return Value::string("[object]");
+        return text.error();
       }
 
-      std::string result(text);
-      JS_FreeCString(context, text);
-
-      return Value::string(std::move(result));
+      return Value::string(text.value());
     }
 
     [[nodiscard]] ScriptResult make_quickjs_failure(
