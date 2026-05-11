@@ -39,6 +39,7 @@
 #include <kordex/bindings/ValueType.hpp>
 #include <kordex/bindings/Version.hpp>
 #include <kordex/bindings/TypeScriptLoader.hpp>
+#include <kordex/bindings/ModuleLoader.hpp>
 
 namespace kordex::bindings
 {

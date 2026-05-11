@@ -20,6 +20,7 @@
 
 #include <kordex/bindings/backend/QuickJsBackendDriver.hpp>
 #include <kordex/bindings/TypeScriptLoader.hpp>
+#include <kordex/bindings/ModuleLoader.hpp>
 
 #if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
 #include <quickjs.h>
@@ -422,7 +423,7 @@ namespace kordex::bindings
           1);
     }
 
-    if (!script.executable())
+    if (!script.executable() && script.type() != ScriptType::Json)
     {
       return ScriptResult::failure(
           make_binding_error(
@@ -431,30 +432,22 @@ namespace kordex::bindings
           1);
     }
 
-    if (script.type() == ScriptType::TypeScript)
+    ModuleLoader loader;
+
+    auto loaded = loader.load_entry(std::move(script));
+    if (!loaded)
     {
-      TypeScriptLoader loader;
-
-      auto loaded = loader.transpile(std::move(script));
-      if (!loaded)
-      {
-        return ScriptResult::failure(
-            loaded.error(),
-            1);
-      }
-
-      return eval(
-          engine_context,
-          loaded.value().script.source(),
-          loaded.value().script.name().empty()
-              ? "main.js"
-              : loaded.value().script.name());
+      return ScriptResult::failure(
+          loaded.error(),
+          1);
     }
 
     return eval(
         engine_context,
-        script.source(),
-        script.name().empty() ? "main.js" : script.name());
+        loaded.value().script.source(),
+        loaded.value().script.name().empty()
+            ? "main.js"
+            : loaded.value().script.name());
   }
 
   ScriptResult QuickJsBackendDriver::eval(
