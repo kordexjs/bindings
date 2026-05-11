@@ -16,6 +16,7 @@
 
 #include <utility>
 #include <kordex/bindings/Engine.hpp>
+#include <kordex/bindings/backend/NativeBackendDriver.hpp>
 
 namespace kordex::bindings
 {
@@ -43,11 +44,11 @@ namespace kordex::bindings
       : Engine(BindingConfig{})
   {
   }
-
   Engine::Engine(BindingConfig config)
       : config_(std::move(config)),
         info_(),
-        context_(config_)
+        context_(config_),
+        backend_driver_()
   {
     info_.backend = config_.backend;
     info_.name = config_.engine_name.empty()
@@ -60,7 +61,8 @@ namespace kordex::bindings
       std::string name)
       : config_(std::move(config)),
         info_(),
-        context_(config_)
+        context_(config_),
+        backend_driver_()
   {
     info_.backend = config_.backend;
     info_.name = std::move(name);
@@ -186,6 +188,25 @@ namespace kordex::bindings
           1);
     }
 
+    const auto backend_error = create_backend_driver();
+    if (backend_error)
+    {
+      mark_state(EngineState::Failed);
+
+      return BindingResult::failure(
+          make_binding_error(
+              BindingErrorCode::EngineInitializationFailed,
+              std::string(backend_error.message())),
+          1);
+    }
+
+    const auto backend_init = backend_driver_->initialize(context_);
+    if (!backend_init.succeeded())
+    {
+      mark_state(EngineState::Failed);
+      return backend_init;
+    }
+
     info_.initialized = true;
     mark_state(EngineState::Running);
 
@@ -200,6 +221,18 @@ namespace kordex::bindings
     }
 
     mark_state(EngineState::Stopping);
+
+    if (backend_driver_)
+    {
+      const auto backend_result = backend_driver_->shutdown(context_);
+      if (!backend_result.succeeded())
+      {
+        mark_state(EngineState::Failed);
+        return backend_result;
+      }
+
+      backend_driver_.reset();
+    }
 
     const auto context_error = context_.shutdown();
     if (context_error)
@@ -355,7 +388,18 @@ namespace kordex::bindings
           1);
     }
 
-    return context_.run_script(std::move(script));
+    if (!backend_driver_)
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::EngineUnavailable,
+              "engine backend driver is not available"),
+          1);
+    }
+
+    return backend_driver_->run_script(
+        context_,
+        std::move(script));
   }
 
   ScriptResult Engine::eval(
@@ -372,7 +416,17 @@ namespace kordex::bindings
           1);
     }
 
-    return context_.eval(
+    if (!backend_driver_)
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::EngineUnavailable,
+              "engine backend driver is not available"),
+          1);
+    }
+
+    return backend_driver_->eval(
+        context_,
         std::move(source),
         std::move(name));
   }
@@ -407,6 +461,36 @@ namespace kordex::bindings
     }
 
     return ok();
+  }
+
+  Error Engine::create_backend_driver()
+  {
+    switch (config_.backend)
+    {
+    case EngineBackend::Native:
+#if defined(KORDEX_BINDINGS_ENABLE_NATIVE_ENGINE) && KORDEX_BINDINGS_ENABLE_NATIVE_ENGINE
+      backend_driver_ = std::make_unique<NativeBackendDriver>();
+      return ok();
+#else
+      return make_binding_error(
+          BindingErrorCode::EngineUnavailable,
+          "native backend is disabled in this build");
+#endif
+
+    case EngineBackend::QuickJS:
+      return make_binding_error(
+          BindingErrorCode::EngineUnavailable,
+          "QuickJS backend is not connected yet");
+
+    case EngineBackend::V8:
+      return make_binding_error(
+          BindingErrorCode::EngineUnavailable,
+          "V8 backend is not connected yet");
+    }
+
+    return make_binding_error(
+        BindingErrorCode::EngineUnavailable,
+        "unknown engine backend");
   }
 
   void Engine::mark_state(EngineState state) noexcept

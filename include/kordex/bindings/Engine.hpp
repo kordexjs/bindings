@@ -33,6 +33,7 @@
 #include <kordex/bindings/Script.hpp>
 #include <kordex/bindings/ScriptResult.hpp>
 #include <kordex/bindings/Value.hpp>
+#include <kordex/bindings/backend/EngineBackendDriver.hpp>
 
 namespace kordex::bindings
 {
@@ -299,9 +300,12 @@ namespace kordex::bindings
 
     void mark_state(EngineState state) noexcept;
 
+    [[nodiscard]] Error create_backend_driver();
+
     BindingConfig config_{};
     EngineInfo info_{};
     EngineContext context_{};
+    std::unique_ptr<EngineBackendDriver> backend_driver_{};
   };
 
   /**
