@@ -542,28 +542,29 @@ The QuickJS backend is responsible for:
 From the module directory:
 
 ```bash
-cmake -S . -B build-ninja -G Ninja
-cmake --build build-ninja
+vix build \
+  --preset dev-ninja
 ```
 
 With QuickJS enabled:
 
 ```bash
-cmake -S . -B build-quickjs -G Ninja \
+vix build \
+  --preset dev-ninja \
+  -- \
   -DKORDEX_BINDINGS_ENABLE_QUICKJS=ON \
   -DKORDEX_BINDINGS_ENABLE_NATIVE_ENGINE=OFF
-
-cmake --build build-quickjs
 ```
 
 With tests:
 
 ```bash
-cmake -S . -B build-ninja -G Ninja \
+vix build \
+  --preset dev-ninja \
+  -- \
   -DKORDEX_BINDINGS_BUILD_TESTS=ON
 
-cmake --build build-ninja
-ctest --test-dir build-ninja --output-on-failure
+vix tests -- --output-on-failure
 ```
 
 ## Examples
