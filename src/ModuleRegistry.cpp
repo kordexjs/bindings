@@ -50,7 +50,11 @@ namespace kordex::bindings
           "module is invalid");
     }
 
-    return register_module(module.name(), std::move(module));
+    const std::string name = module.name();
+
+    return register_module(
+        name,
+        std::move(module));
   }
 
   Error ModuleRegistry::register_module(

@@ -8,7 +8,7 @@
   "deps": [
     {
       "id": "softadastra/kordex-runtime",
-      "version": "0.1.2"
+      "version": "0.2.0"
     }
   ],
   "description": "Native bindings layer for Kordex, bridging the Kordex runtime with script execution, engine contexts, values, modules, scripts, and runtime integration.",
@@ -28,5 +28,5 @@
   "namespace": "softadastra",
   "repository": "https://github.com/softadastra/kordex-bindings",
   "type": "library",
-  "version": "0.1.1"
+  "version": "0.2.0"
 }

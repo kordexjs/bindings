@@ -111,26 +111,6 @@ namespace kordex::bindings
       return specifiers;
     }
 
-    [[nodiscard]] std::string replace_all(
-        std::string source,
-        const std::string &from,
-        const std::string &to)
-    {
-      if (from.empty())
-      {
-        return source;
-      }
-
-      std::size_t position = 0;
-      while ((position = source.find(from, position)) != std::string::npos)
-      {
-        source.replace(position, from.size(), to);
-        position += to.size();
-      }
-
-      return source;
-    }
-
     [[nodiscard]] std::string trim(
         std::string value)
     {

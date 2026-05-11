@@ -14,7 +14,10 @@
  *
  */
 
+#include <iostream>
 #include <string_view>
+#include <utility>
+
 #include <kordex/bindings/Module.hpp>
 
 namespace
@@ -25,7 +28,10 @@ namespace
   {
     if (!condition)
     {
-      (void)message;
+      ::std::cerr << "[test_module] failed: "
+                  << (message ? message : "unknown assertion")
+                  << '\n';
+
       return false;
     }
 
@@ -219,7 +225,8 @@ namespace
           return kordex::bindings::Value::number(42.0);
         });
 
-    const auto add_error = module.add_function(function);
+    const auto add_error = module.add_function(
+        ::std::move(function));
 
     auto stored_function = module.function("answer");
 
@@ -278,7 +285,9 @@ namespace
           return kordex::bindings::Value::number(42.0);
         });
 
-    const auto add_error = module.set_function("answer", function);
+    const auto add_error = module.set_function(
+        "answer",
+        ::std::move(function));
 
     return expect_true(
                !add_error,
@@ -321,7 +330,8 @@ namespace
               left.value() + right.value());
         });
 
-    const auto add_error = module.add_function(function);
+    const auto add_error = module.add_function(
+        ::std::move(function));
 
     kordex::bindings::FunctionArguments args{
         kordex::bindings::Value::number(20.0),
@@ -403,7 +413,9 @@ namespace
           return kordex::bindings::Value::undefined();
         });
 
-    const auto set_function_error = module.set_function("", function);
+    const auto set_function_error = module.set_function(
+        "",
+        ::std::move(function));
     auto get_function = module.function("");
     const auto remove_function_error = module.remove_function("");
 
@@ -451,7 +463,8 @@ namespace
           return kordex::bindings::Value::string("hello");
         });
 
-    const auto function_error = module.add_function(function);
+    const auto function_error = module.add_function(
+        ::std::move(function));
 
     const auto remove_export_error = module.remove_export("version");
     const auto remove_function_error = module.remove_function("hello");
@@ -492,7 +505,8 @@ namespace
           return kordex::bindings::Value::undefined();
         });
 
-    const auto function_error = module.add_function(function);
+    const auto function_error = module.add_function(
+        ::std::move(function));
 
     const auto export_names = module.export_names();
     const auto function_names = module.function_names();
@@ -538,7 +552,8 @@ namespace
           return kordex::bindings::Value::undefined();
         });
 
-    const auto function_error = native_module.add_function(native_function);
+    const auto function_error = native_module.add_function(
+        ::std::move(native_function));
 
     auto module = kordex::bindings::Module::from_native(native_module);
 
@@ -578,7 +593,8 @@ namespace
           return kordex::bindings::Value::undefined();
         });
 
-    const auto function_error = module.add_function(function);
+    const auto function_error = module.add_function(
+        ::std::move(function));
 
     const auto object = module.to_object();
 

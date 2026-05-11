@@ -52,13 +52,39 @@ function(kordex_bindings_require_target target_name package_name sibling_dir fet
         "[bindings] Umbrella build requires target '${target_name}' to be provided by the root project.")
   endif()
 
+  set(local_dependency_added OFF)
+
   if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../${sibling_dir}/CMakeLists.txt")
     message(STATUS "[bindings] Adding ${target_name} from sibling: ../${sibling_dir}")
 
     add_subdirectory(
         "${CMAKE_CURRENT_LIST_DIR}/../${sibling_dir}"
         "${CMAKE_CURRENT_BINARY_DIR}/_deps/${sibling_dir}")
-  else()
+
+    set(local_dependency_added ON)
+  elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../../deps/vix/${sibling_dir}/CMakeLists.txt")
+    message(STATUS "[bindings] Adding ${target_name} from umbrella dependency: ../../deps/vix/${sibling_dir}")
+
+    add_subdirectory(
+        "${CMAKE_CURRENT_LIST_DIR}/../../deps/vix/${sibling_dir}"
+        "${CMAKE_CURRENT_BINARY_DIR}/_deps/vix_${sibling_dir}")
+
+    set(local_dependency_added ON)
+  elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../../deps/kordex/${sibling_dir}/CMakeLists.txt")
+    message(STATUS "[bindings] Adding ${target_name} from umbrella dependency: ../../deps/kordex/${sibling_dir}")
+
+    add_subdirectory(
+        "${CMAKE_CURRENT_LIST_DIR}/../../deps/kordex/${sibling_dir}"
+        "${CMAKE_CURRENT_BINARY_DIR}/_deps/kordex_${sibling_dir}")
+
+    set(local_dependency_added ON)
+  endif()
+
+  if(TARGET ${target_name})
+    return()
+  endif()
+
+  if(NOT local_dependency_added)
     find_package(${package_name} CONFIG QUIET)
   endif()
 
@@ -84,12 +110,13 @@ function(kordex_bindings_require_target target_name package_name sibling_dir fet
     message(FATAL_ERROR
         "[bindings] Required dependency target '${target_name}' was not found.\n"
         "Install package '${package_name}', provide sibling '../${sibling_dir}', "
+        "provide umbrella dependency '../../deps/vix/${sibling_dir}' or '../../deps/kordex/${sibling_dir}', "
         "or enable ${fetch_option}.")
   endif()
 endfunction()
 
 function(kordex_bindings_setup_quickjs)
-  if(TARGET kordex_quickjs)
+  if(TARGET kordex_quickjs OR TARGET quickjs)
     return()
   endif()
 
@@ -130,15 +157,40 @@ function(kordex_bindings_setup_quickjs)
       GIT_TAG ${KORDEX_QUICKJS_GIT_TAG}
       GIT_SHALLOW TRUE)
 
-  FetchContent_MakeAvailable(quickjs)
+  FetchContent_GetProperties(quickjs)
+
+  if(NOT quickjs_POPULATED)
+    FetchContent_Populate(quickjs)
+  endif()
 
   set(KORDEX_QUICKJS_SOURCE_DIR "${quickjs_SOURCE_DIR}")
 
-  add_library(kordex_quickjs STATIC
+  if(NOT EXISTS "${KORDEX_QUICKJS_SOURCE_DIR}/quickjs.c")
+    message(FATAL_ERROR
+        "[bindings] QuickJS source file was not found: "
+        "${KORDEX_QUICKJS_SOURCE_DIR}/quickjs.c")
+  endif()
+
+  set(KORDEX_QUICKJS_SOURCES
       "${KORDEX_QUICKJS_SOURCE_DIR}/quickjs.c"
       "${KORDEX_QUICKJS_SOURCE_DIR}/libregexp.c"
       "${KORDEX_QUICKJS_SOURCE_DIR}/libunicode.c"
       "${KORDEX_QUICKJS_SOURCE_DIR}/cutils.c")
+
+  if(EXISTS "${KORDEX_QUICKJS_SOURCE_DIR}/libbf.c")
+    list(APPEND KORDEX_QUICKJS_SOURCES
+        "${KORDEX_QUICKJS_SOURCE_DIR}/libbf.c")
+  endif()
+
+  if(EXISTS "${KORDEX_QUICKJS_SOURCE_DIR}/dtoa.c")
+    list(APPEND KORDEX_QUICKJS_SOURCES
+        "${KORDEX_QUICKJS_SOURCE_DIR}/dtoa.c")
+  endif()
+
+  add_library(kordex_quickjs STATIC
+      ${KORDEX_QUICKJS_SOURCES})
+
+  add_library(quickjs ALIAS kordex_quickjs)
 
   target_include_directories(kordex_quickjs
       PUBLIC
@@ -146,22 +198,28 @@ function(kordex_bindings_setup_quickjs)
 
   target_compile_definitions(kordex_quickjs
       PRIVATE
-        CONFIG_VERSION="kordex")
+        CONFIG_VERSION="kordex"
+        _GNU_SOURCE)
 
   target_compile_options(kordex_quickjs
       PRIVATE
         $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-parameter>
         $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-missing-field-initializers>
         $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-sign-compare>
-        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-function>)
+        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-function>
+        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-implicit-fallthrough>)
 
   if(UNIX AND NOT APPLE)
     target_link_libraries(kordex_quickjs
         PUBLIC
+          m
+          dl
+          pthread)
+  elseif(UNIX)
+    target_link_libraries(kordex_quickjs
+        PUBLIC
           m)
   endif()
-
-  add_library(quickjs ALIAS kordex_quickjs)
 endfunction()
 
 # --------------------------------------------------------------------

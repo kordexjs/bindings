@@ -549,11 +549,12 @@ namespace kordex::bindings
       const kordex::runtime::ResolvedModule &resolved_module)
   {
     const bool module_valid = resolved_module.valid();
+    const bool builtin = resolved_module.is_builtin();
 
     ModuleInfo info;
     info.name = resolved_module.id.specifier();
     info.path = resolved_module.path;
-    info.kind = resolved_module.id.is_builtin()
+    info.kind = builtin
                     ? ModuleKind::Builtin
                     : ModuleKind::Script;
     info.importable = true;
@@ -575,7 +576,7 @@ namespace kordex::bindings
 
     (void)module.set_export(
         "builtin",
-        Value::boolean(resolved_module.id.is_builtin()));
+        Value::boolean(builtin));
 
     return module;
   }

@@ -93,14 +93,18 @@ namespace kordex::bindings
           "native module function is invalid");
     }
 
-    if (function.name().empty())
+    const ::std::string name = function.name();
+
+    if (name.empty())
     {
       return make_binding_error(
           BindingErrorCode::InvalidArgument,
           "native module function name cannot be empty");
     }
 
-    return add_function(function.name(), std::move(function));
+    return add_function(
+        name,
+        ::std::move(function));
   }
 
   Error NativeModule::add_function(

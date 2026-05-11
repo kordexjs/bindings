@@ -20,12 +20,23 @@
 #include <vector>
 
 #include <kordex/bindings/backend/QuickJsBackendDriver.hpp>
+#include <kordex/bindings/ModuleLoader.hpp>
 #include <kordex/bindings/TypeScriptLoader.hpp>
-#include <kordex/bindings/ModuleLoader.hpp>
-#include <kordex/bindings/ModuleLoader.hpp>
 
 #if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 #include <quickjs.h>
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
 #endif
 
 namespace kordex::bindings
@@ -34,6 +45,28 @@ namespace kordex::bindings
 
   namespace
   {
+    [[nodiscard]] ::std::string quickjs_exception_message(
+        JSContext *context);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
+    [[nodiscard]] JSValue quickjs_undefined() noexcept
+    {
+      return JS_UNDEFINED;
+    }
+
+    [[nodiscard]] JSValue quickjs_null() noexcept
+    {
+      return JS_NULL;
+    }
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
     [[nodiscard]] JSRuntime *as_runtime(void *runtime) noexcept
     {
       return static_cast<JSRuntime *>(runtime);
@@ -45,12 +78,12 @@ namespace kordex::bindings
     {
       if (value.is_undefined())
       {
-        return JS_UNDEFINED;
+        return quickjs_undefined();
       }
 
       if (value.is_null())
       {
-        return JS_NULL;
+        return quickjs_null();
       }
 
       if (value.is_boolean())
@@ -441,8 +474,8 @@ namespace kordex::bindings
       JSValue json = JS_JSONStringify(
           context,
           value,
-          JS_UNDEFINED,
-          JS_UNDEFINED);
+          quickjs_undefined(),
+          quickjs_undefined());
 
       if (!JS_IsException(json) && !JS_IsUndefined(json))
       {

@@ -14,7 +14,10 @@
  *
  */
 
+#include <iostream>
 #include <string_view>
+#include <utility>
+
 #include <kordex/bindings/RuntimeBridge.hpp>
 
 namespace
@@ -25,7 +28,10 @@ namespace
   {
     if (!condition)
     {
-      (void)message;
+      ::std::cerr << "[test_runtime_bridge] failed: "
+                  << (message ? message : "unknown assertion")
+                  << '\n';
+
       return false;
     }
 
@@ -89,7 +95,7 @@ namespace
       return false;
     }
 
-    auto &bridge = result.value();
+    auto bridge = ::std::move(result.value());
 
     return expect_true(
                bridge.attached(),
@@ -118,7 +124,7 @@ namespace
       return false;
     }
 
-    auto &bridge = result.value();
+    auto bridge = ::std::move(result.value());
 
     return expect_true(
                bridge.attached(),
@@ -144,7 +150,7 @@ namespace
       return false;
     }
 
-    auto &bridge = result.value();
+    auto bridge = ::std::move(result.value());
 
     return expect_true(
                bridge.attached(),
@@ -708,8 +714,9 @@ namespace
 
     kordex::runtime::ResolvedModule resolved_module;
     resolved_module.id = module_id.value();
+    resolved_module.kind = kordex::runtime::ResolvedModuleKind::Builtin;
     resolved_module.path = "kordex:fs";
-    resolved_module.found = true;
+    resolved_module.builtin_name = "fs";
 
     auto module = kordex::bindings::RuntimeBridge::module_from_resolved_module(
         resolved_module);
@@ -766,7 +773,6 @@ namespace
                builtin_bool.value(),
                "converted module builtin value should be true");
   }
-
 } // namespace
 
 int main()

@@ -14,7 +14,10 @@
  *
  */
 
+#include <iostream>
 #include <string_view>
+#include <utility>
+
 #include <kordex/bindings/Engine.hpp>
 
 namespace
@@ -25,11 +28,26 @@ namespace
   {
     if (!condition)
     {
-      (void)message;
+      ::std::cerr << "[test_engine] failed: "
+                  << (message ? message : "unknown assertion")
+                  << '\n';
+
       return false;
     }
 
     return true;
+  }
+
+  [[nodiscard]] kordex::bindings::Engine make_native_function_engine()
+  {
+    kordex::bindings::BindingConfig config;
+    config.engine_name = "native";
+    config.backend = kordex::bindings::EngineBackend::Native;
+    config.module_policy = kordex::bindings::ModulePolicy::Full;
+    config.allow_native_functions = true;
+    config.allow_native_modules = true;
+
+    return kordex::bindings::Engine(config);
   }
 
   template <typename T>
@@ -102,7 +120,7 @@ namespace
 
   [[nodiscard]] bool test_default_engine()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     return expect_true(
                !engine.initialized(),
@@ -141,7 +159,7 @@ namespace
       return false;
     }
 
-    auto engine = engine_result.value();
+    auto engine = ::std::move(engine_result.value());
 
     return expect_true(
                !engine.initialized(),
@@ -170,7 +188,7 @@ namespace
       return false;
     }
 
-    auto engine = engine_result.value();
+    auto engine = ::std::move(engine_result.value());
 
     return expect_true(
                engine.config().debug,
@@ -205,7 +223,7 @@ namespace
       return false;
     }
 
-    auto engine = engine_result.value();
+    auto engine = ::std::move(engine_result.value());
 
     return expect_true(
                engine.config().has_stack_limit(),
@@ -220,7 +238,7 @@ namespace
 
   [[nodiscard]] bool test_initialize_and_shutdown()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
     const bool initialized = engine.initialized();
@@ -260,7 +278,7 @@ namespace
 
   [[nodiscard]] bool test_initialize_invalid_engine_name()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
     engine.set_name("");
 
     auto result = engine.initialize();
@@ -285,7 +303,8 @@ namespace
 
   [[nodiscard]] bool test_set_name()
   {
-    kordex::bindings::Engine engine;
+
+    auto engine = make_native_function_engine();
 
     engine.set_name("main-engine");
 
@@ -299,7 +318,7 @@ namespace
 
   [[nodiscard]] bool test_operations_require_running()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     const auto set_global_error = engine.set_global(
         "answer",
@@ -315,7 +334,8 @@ namespace
           return kordex::bindings::Value::number(42.0);
         });
 
-    const auto function_error = engine.add_global_function(function);
+    const auto function_error = engine.add_global_function(
+        ::std::move(function));
     auto import_result = engine.import_module("missing");
 
     return expect_true(
@@ -338,7 +358,7 @@ namespace
 
   [[nodiscard]] bool test_global_values()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -381,7 +401,7 @@ namespace
 
   [[nodiscard]] bool test_global_functions()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -393,7 +413,8 @@ namespace
           return kordex::bindings::Value::number(42.0);
         });
 
-    const auto add_error = engine.add_global_function(function);
+    const auto add_error = engine.add_global_function(
+        ::std::move(function));
     auto call_result = engine.call_global_function("answer");
 
     if (!expect_true(
@@ -429,7 +450,7 @@ namespace
 
   [[nodiscard]] bool test_set_global_function_explicit_name()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -443,7 +464,7 @@ namespace
 
     const auto set_error = engine.set_global_function(
         "answer",
-        function);
+        ::std::move(function));
 
     auto call_result = engine.call_global_function("answer");
 
@@ -468,7 +489,7 @@ namespace
 
   [[nodiscard]] bool test_register_and_import_module()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -476,13 +497,28 @@ namespace
         "main",
         kordex::bindings::ModuleKind::Script);
 
-    const auto register_error = engine.register_module(module);
+    module.mark_loaded();
+
+    const auto register_error = engine.register_module(
+        ::std::move(module));
+
     auto imported_module = engine.import_module("main");
 
-    if (!expect_true(
-            init_result.succeeded() && !register_error,
-            "engine initialize and module registration should succeed"))
+    if (!init_result.succeeded())
     {
+      ::std::cerr << "[test_engine] init error: "
+                  << init_result.error.message()
+                  << '\n';
+
+      return false;
+    }
+
+    if (register_error)
+    {
+      ::std::cerr << "[test_engine] register module error: "
+                  << register_error.message()
+                  << '\n';
+
       return false;
     }
 
@@ -503,7 +539,7 @@ namespace
 
   [[nodiscard]] bool test_register_native_module()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -544,7 +580,7 @@ namespace
 
   [[nodiscard]] bool test_run_script()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -588,7 +624,7 @@ namespace
 
   [[nodiscard]] bool test_run_script_requires_running()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto script = kordex::bindings::Script::from_source(
         "console.log('hello');",
@@ -610,7 +646,7 @@ namespace
 
   [[nodiscard]] bool test_eval()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -648,7 +684,7 @@ namespace
 
   [[nodiscard]] bool test_clear()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -664,13 +700,17 @@ namespace
           return kordex::bindings::Value::undefined();
         });
 
-    const auto function_error = engine.add_global_function(function);
+    const auto function_error = engine.add_global_function(
+        ::std::move(function));
 
     auto module = kordex::bindings::Module::create(
         "c",
         kordex::bindings::ModuleKind::Script);
 
-    const auto module_error = engine.register_module(module);
+    module.mark_loaded();
+
+    const auto module_error = engine.register_module(
+        ::std::move(module));
 
     const bool setup_ok =
         init_result.succeeded() &&
@@ -699,7 +739,7 @@ namespace
 
   [[nodiscard]] bool test_shutdown_blocks_operations_but_preserves_context_data()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 
@@ -736,7 +776,7 @@ namespace
 
   [[nodiscard]] bool test_reinitialize_resets_context()
   {
-    kordex::bindings::Engine engine;
+    auto engine = make_native_function_engine();
 
     auto init_result = engine.initialize();
 

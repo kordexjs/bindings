@@ -299,14 +299,18 @@ namespace kordex::bindings
           "global function is invalid");
     }
 
-    if (function.name().empty())
+    const ::std::string name = function.name();
+
+    if (name.empty())
     {
       return make_binding_error(
           BindingErrorCode::InvalidArgument,
           "global function name cannot be empty");
     }
 
-    return set_global_function(function.name(), std::move(function));
+    return set_global_function(
+        name,
+        ::std::move(function));
   }
 
   Result<Function> EngineContext::global_function(
@@ -388,7 +392,18 @@ namespace kordex::bindings
       return state;
     }
 
-    return registry_.register_module(std::move(module));
+    const ::std::string name = module.name();
+
+    if (name.empty())
+    {
+      return make_binding_error(
+          BindingErrorCode::InvalidArgument,
+          "module name cannot be empty");
+    }
+
+    return registry_.register_module(
+        name,
+        ::std::move(module));
   }
 
   Error EngineContext::register_native_module(

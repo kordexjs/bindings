@@ -217,18 +217,22 @@ namespace kordex::bindings
     if (!function.valid())
     {
       return make_binding_error(
-          BindingErrorCode::ModuleRegistrationFailed,
+          BindingErrorCode::FunctionCallFailed,
           "module function is invalid");
     }
 
-    if (function.name().empty())
+    const ::std::string name = function.name();
+
+    if (name.empty())
     {
       return make_binding_error(
           BindingErrorCode::InvalidArgument,
           "module function name cannot be empty");
     }
 
-    return set_function(function.name(), std::move(function));
+    return set_function(
+        name,
+        ::std::move(function));
   }
 
   Result<Function> Module::function(

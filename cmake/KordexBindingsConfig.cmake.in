@@ -2,11 +2,44 @@
 
 include(CMakeFindDependencyMacro)
 
-find_dependency(kordex_runtime CONFIG REQUIRED)
-find_dependency(vix_error CONFIG REQUIRED)
-find_dependency(vix_log CONFIG REQUIRED)
-find_dependency(vix_json CONFIG REQUIRED)
+# --------------------------------------------------------------------
+# Dependencies
+# --------------------------------------------------------------------
+# The package config can be used in two situations:
+#
+# 1. Standalone installed package:
+#    Dependencies must be resolved with find_dependency(...).
+#
+# 2. Umbrella / superbuild / sibling build:
+#    Dependency targets may already exist in the current CMake graph.
+#    In that case, do not call find_dependency(...), because the package
+#    may not be installed even though the target is already available.
+# --------------------------------------------------------------------
+
+if(NOT TARGET kordex::runtime)
+  find_dependency(kordex_runtime CONFIG REQUIRED)
+endif()
+
+if(NOT TARGET vix::error)
+  find_dependency(vix_error CONFIG REQUIRED)
+endif()
+
+if(NOT TARGET vix::log)
+  find_dependency(vix_log CONFIG REQUIRED)
+endif()
+
+if(NOT TARGET vix::json)
+  find_dependency(vix_json CONFIG REQUIRED)
+endif()
+
+# --------------------------------------------------------------------
+# Targets
+# --------------------------------------------------------------------
 
 include("${CMAKE_CURRENT_LIST_DIR}/kordex_bindingsTargets.cmake")
+
+# --------------------------------------------------------------------
+# Components
+# --------------------------------------------------------------------
 
 check_required_components(kordex_bindings)
