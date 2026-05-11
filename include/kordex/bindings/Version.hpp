@@ -24,21 +24,21 @@ namespace kordex::bindings
   /**
    * @brief Kordex bindings semantic version numbers.
    */
-  inline constexpr int KORDEX_BINDINGS_VERSION_MAJOR = 0;
-  inline constexpr int KORDEX_BINDINGS_VERSION_MINOR = 1;
-  inline constexpr int KORDEX_BINDINGS_VERSION_PATCH = 0;
+  inline constexpr int version_major_value = 0;
+  inline constexpr int version_minor_value = 1;
+  inline constexpr int version_patch_value = 0;
 
   /**
    * @brief Kordex bindings version as a stable string.
    */
-  inline constexpr std::string_view KORDEX_BINDINGS_VERSION = "0.1.0";
+  inline constexpr std::string_view version_string = "0.1.0";
 
   /**
    * @brief Return the Kordex bindings major version.
    */
   [[nodiscard]] constexpr int version_major() noexcept
   {
-    return KORDEX_BINDINGS_VERSION_MAJOR;
+    return version_major_value;
   }
 
   /**
@@ -46,7 +46,7 @@ namespace kordex::bindings
    */
   [[nodiscard]] constexpr int version_minor() noexcept
   {
-    return KORDEX_BINDINGS_VERSION_MINOR;
+    return version_minor_value;
   }
 
   /**
@@ -54,7 +54,7 @@ namespace kordex::bindings
    */
   [[nodiscard]] constexpr int version_patch() noexcept
   {
-    return KORDEX_BINDINGS_VERSION_PATCH;
+    return version_patch_value;
   }
 
   /**
@@ -62,7 +62,7 @@ namespace kordex::bindings
    */
   [[nodiscard]] constexpr std::string_view version() noexcept
   {
-    return KORDEX_BINDINGS_VERSION;
+    return version_string;
   }
 
 } // namespace kordex::bindings

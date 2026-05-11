@@ -548,6 +548,8 @@ namespace kordex::bindings
   Module RuntimeBridge::module_from_resolved_module(
       const kordex::runtime::ResolvedModule &resolved_module)
   {
+    const bool module_valid = resolved_module.valid();
+
     ModuleInfo info;
     info.name = resolved_module.id.specifier();
     info.path = resolved_module.path;
@@ -555,7 +557,7 @@ namespace kordex::bindings
                     ? ModuleKind::Builtin
                     : ModuleKind::Script;
     info.importable = true;
-    info.loaded = resolved_module.found;
+    info.loaded = module_valid;
 
     Module module = Module::create(std::move(info));
 
@@ -569,7 +571,7 @@ namespace kordex::bindings
 
     (void)module.set_export(
         "found",
-        Value::boolean(resolved_module.found));
+        Value::boolean(module_valid));
 
     (void)module.set_export(
         "builtin",

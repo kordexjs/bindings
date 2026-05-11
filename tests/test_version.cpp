@@ -54,22 +54,22 @@ namespace
                kordex::bindings::version() == expected,
                "version string should be 0.1.0") &&
            expect_true(
-               kordex::bindings::KORDEX_BINDINGS_VERSION == expected,
+               kordex::bindings::version_string == expected,
                "constant version string should be 0.1.0");
   }
 
   [[nodiscard]] bool test_version_constants()
   {
     return expect_true(
-               kordex::bindings::KORDEX_BINDINGS_VERSION_MAJOR ==
+               kordex::bindings::version_major_value ==
                    kordex::bindings::version_major(),
                "major constant should match version_major") &&
            expect_true(
-               kordex::bindings::KORDEX_BINDINGS_VERSION_MINOR ==
+               kordex::bindings::version_minor_value ==
                    kordex::bindings::version_minor(),
                "minor constant should match version_minor") &&
            expect_true(
-               kordex::bindings::KORDEX_BINDINGS_VERSION_PATCH ==
+               kordex::bindings::version_patch_value ==
                    kordex::bindings::version_patch(),
                "patch constant should match version_patch");
   }

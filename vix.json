@@ -1,0 +1,32 @@
+{
+  "name": "kordex-bindings",
+  "namespace": "softadastra",
+  "version": "0.1.0",
+  "type": "library",
+  "include": "include",
+  "license": "MIT",
+  "description": "Native bindings layer for Kordex, bridging the Kordex runtime with script execution, engine contexts, values, modules, scripts, and runtime integration.",
+  "keywords": [
+    "cpp",
+    "bindings",
+    "javascript-runtime",
+    "runtime-bridge",
+    "local-first",
+    "kordex",
+    "softadastra",
+    "vix"
+  ],
+  "repository": "https://github.com/softadastra/kordex-bindings",
+  "authors": [
+    {
+      "name": "Softadastra",
+      "github": "softadastra"
+    }
+  ],
+  "deps": [
+    {
+      "id": "softadastra/kordex-runtime",
+      "version": "0.1.0"
+    }
+  ]
+}
