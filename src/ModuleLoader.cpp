@@ -23,6 +23,7 @@
 
 #include <kordex/bindings/ModuleLoader.hpp>
 #include <kordex/bindings/TypeScriptLoader.hpp>
+#include <kordex/bindings/EngineContext.hpp>
 
 namespace kordex::bindings
 {
@@ -350,6 +351,12 @@ namespace kordex::bindings
 
       return source;
     }
+
+    [[nodiscard]] bool is_builtin_specifier(
+        const std::string &specifier) noexcept
+    {
+      return specifier.rfind("kordex:", 0) == 0;
+    }
   } // namespace
 
   bool ModuleLoaderReport::has_loaded_modules() const noexcept
@@ -360,6 +367,16 @@ namespace kordex::bindings
   ModuleLoader::ModuleLoader(
       ModuleLoaderOptions options)
       : options_(options),
+        context_(nullptr),
+        cache_()
+  {
+  }
+
+  ModuleLoader::ModuleLoader(
+      const EngineContext *context,
+      ModuleLoaderOptions options)
+      : options_(options),
+        context_(context),
         cache_()
   {
   }
@@ -549,6 +566,152 @@ namespace kordex::bindings
     return module;
   }
 
+  Result<ModuleLoader::LoadedModule> ModuleLoader::load_builtin_module(
+      const std::string &specifier,
+      ModuleLoaderReport &report)
+  {
+    if (!context_)
+    {
+      return make_binding_error(
+          BindingErrorCode::ContextUnavailable,
+          "builtin imports require an engine context");
+    }
+
+    const std::string canonical = canonical_builtin_name(specifier);
+
+    auto imported = context_->import_module(canonical);
+    if (!imported)
+    {
+      imported = context_->import_module(specifier);
+    }
+
+    if (!imported)
+    {
+      return make_binding_error(
+          BindingErrorCode::ModuleNotFound,
+          std::string(imported.error().message()));
+    }
+
+    LoadedModule module;
+    module.id = specifier;
+    module.path = specifier;
+    module.native_module = imported.value();
+    module.builtin = true;
+    module.json = false;
+
+    if (options_.cache_enabled)
+    {
+      const auto cached = cache_.find(module.id);
+      if (cached != cache_.end())
+      {
+        report.used_cache = true;
+        return cached->second;
+      }
+    }
+
+    auto transformed = transform_builtin_module_source(module);
+    if (!transformed)
+    {
+      return transformed.error();
+    }
+
+    module.transformed_source = transformed.value();
+
+    if (std::find(
+            report.loaded_modules.begin(),
+            report.loaded_modules.end(),
+            module.path) == report.loaded_modules.end())
+    {
+      report.loaded_modules.push_back(module.path);
+    }
+
+    if (options_.cache_enabled)
+    {
+      cache_[module.id] = module;
+    }
+
+    return module;
+  }
+
+  Result<std::string> ModuleLoader::transform_builtin_module_source(
+      const LoadedModule &module) const
+  {
+    if (!module.builtin)
+    {
+      return make_binding_error(
+          BindingErrorCode::InvalidArgument,
+          "module is not a builtin module");
+    }
+
+    std::ostringstream source;
+
+    for (const auto &[name, value] : module.native_module.exports())
+    {
+      source << "exports.";
+      source << name;
+      source << " = ";
+
+      if (value.is_undefined())
+      {
+        source << "undefined";
+      }
+      else if (value.is_null())
+      {
+        source << "null";
+      }
+      else if (value.is_boolean())
+      {
+        auto boolean = value.as_boolean();
+        source << (boolean && boolean.value() ? "true" : "false");
+      }
+      else if (value.is_number())
+      {
+        auto number = value.as_number();
+        source << (number ? std::to_string(number.value()) : "0");
+      }
+      else if (value.is_string())
+      {
+        auto text = value.as_string();
+        source << js_string(text ? text.value() : std::string{});
+      }
+      else
+      {
+        source << "undefined";
+      }
+
+      source << ";\n";
+    }
+
+    for (const auto &name : module.native_module.function_names())
+    {
+      source << "exports.";
+      source << name;
+      source << " = function(...args) { ";
+      source << "return __kordex_call_native(";
+      source << js_string(canonical_builtin_name(module.id));
+      source << ", ";
+      source << js_string(name);
+      source << ", ...args);";
+      source << " };\n";
+    }
+
+    return source.str();
+  }
+
+  std::string ModuleLoader::canonical_builtin_name(
+      const std::string &specifier)
+  {
+    constexpr std::string_view prefix = "kordex:";
+
+    if (specifier.size() > prefix.size() &&
+        specifier.rfind(prefix, 0) == 0)
+    {
+      return specifier.substr(prefix.size());
+    }
+
+    return specifier;
+  }
+
   Result<ModuleLoader::LoadedModule> ModuleLoader::load_dependency(
       const std::string &specifier,
       const LoadedModule &parent,
@@ -568,12 +731,26 @@ namespace kordex::bindings
           "absolute module imports are disabled: " + specifier);
     }
 
+    if (is_builtin_specifier(specifier))
+    {
+      if (!options_.allow_builtins)
+      {
+        return make_binding_error(
+            BindingErrorCode::PermissionDenied,
+            "builtin module imports are disabled: " + specifier);
+      }
+
+      return load_builtin_module(
+          specifier,
+          report);
+    }
+
     if (!is_relative_specifier(specifier) &&
         !is_absolute_specifier(specifier))
     {
       return make_binding_error(
           BindingErrorCode::ModuleNotFound,
-          "package and builtin imports are not connected yet: " + specifier);
+          "package imports are not connected yet: " + specifier);
     }
 
     auto path = resolve_dependency_path(
@@ -677,6 +854,18 @@ namespace kordex::bindings
 
     auto replacement_for = [&](const std::string &specifier) -> Result<std::string>
     {
+      if (is_builtin_specifier(specifier))
+      {
+        if (cache_.find(specifier) == cache_.end())
+        {
+          return make_binding_error(
+              BindingErrorCode::ModuleNotFound,
+              "builtin module was resolved but not loaded: " + specifier);
+        }
+
+        return specifier;
+      }
+
       auto dependency_path = resolve_dependency_path(
           specifier,
           module);

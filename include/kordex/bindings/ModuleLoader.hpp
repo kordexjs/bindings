@@ -17,13 +17,16 @@
 #ifndef KORDEX_BINDINGS_MODULE_LOADER_HPP
 #define KORDEX_BINDINGS_MODULE_LOADER_HPP
 
+#include <cstddef>
 #include <map>
 #include <string>
 #include <vector>
 
 #include <kordex/runtime/ModuleResolver.hpp>
 
+#include <kordex/bindings/EngineContext.hpp>
 #include <kordex/bindings/Error.hpp>
+#include <kordex/bindings/Module.hpp>
 #include <kordex/bindings/Result.hpp>
 #include <kordex/bindings/Script.hpp>
 
@@ -41,7 +44,7 @@ namespace kordex::bindings
     bool allow_typescript{true};
 
     bool allow_packages{false};
-    bool allow_builtins{false};
+    bool allow_builtins{true};
 
     bool cache_enabled{true};
   };
@@ -74,14 +77,18 @@ namespace kordex::bindings
    * @class ModuleLoader
    * @brief Minimal static import loader for QuickJS execution.
    *
-   * ModuleLoader resolves relative JavaScript, TypeScript, and JSON modules
-   * through kordex::runtime::ModuleResolver, then emits a small CommonJS-like
-   * bundle that QuickJS can execute with JS_Eval.
+   * ModuleLoader resolves relative JavaScript, TypeScript, JSON, and builtin
+   * Kordex modules, then emits a small CommonJS-like bundle executable by
+   * QuickJS through JS_Eval.
    */
   class ModuleLoader
   {
   public:
     explicit ModuleLoader(
+        ModuleLoaderOptions options = {});
+
+    explicit ModuleLoader(
+        const EngineContext *context,
         ModuleLoaderOptions options = {});
 
     [[nodiscard]] const ModuleLoaderOptions &options() const noexcept;
@@ -116,7 +123,9 @@ namespace kordex::bindings
       Script script{};
       std::string transformed_source{};
       std::vector<std::string> dependencies{};
+      Module native_module{};
       bool json{false};
+      bool builtin{false};
     };
 
     [[nodiscard]] Result<Script> normalize_entry(
@@ -132,6 +141,10 @@ namespace kordex::bindings
         const LoadedModule &parent,
         ModuleLoaderReport &report);
 
+    [[nodiscard]] Result<LoadedModule> load_builtin_module(
+        const std::string &specifier,
+        ModuleLoaderReport &report);
+
     [[nodiscard]] Result<Script> load_script_from_path(
         const std::string &path) const;
 
@@ -142,6 +155,9 @@ namespace kordex::bindings
     [[nodiscard]] Result<std::string> transform_module_source(
         const LoadedModule &module,
         const std::map<std::string, LoadedModule> &modules) const;
+
+    [[nodiscard]] Result<std::string> transform_builtin_module_source(
+        const LoadedModule &module) const;
 
     [[nodiscard]] Result<std::string> build_bundle(
         const LoadedModule &entry,
@@ -159,7 +175,11 @@ namespace kordex::bindings
     [[nodiscard]] static std::string js_string(
         const std::string &value);
 
+    [[nodiscard]] static std::string canonical_builtin_name(
+        const std::string &specifier);
+
     ModuleLoaderOptions options_{};
+    const EngineContext *context_{nullptr};
     std::map<std::string, LoadedModule> cache_{};
   };
 
