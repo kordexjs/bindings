@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.20)
 project(kordex_bindings
     VERSION 0.1.0
     DESCRIPTION "Native bindings layer for Kordex."
-    LANGUAGES CXX)
+    LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -88,6 +88,82 @@ function(kordex_bindings_require_target target_name package_name sibling_dir fet
   endif()
 endfunction()
 
+function(kordex_bindings_setup_quickjs)
+  if(TARGET kordex_quickjs)
+    return()
+  endif()
+
+  if(NOT KORDEX_BINDINGS_ENABLE_QUICKJS)
+    return()
+  endif()
+
+  if(DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD)
+    if(NOT TARGET quickjs AND NOT TARGET kordex_quickjs)
+      message(FATAL_ERROR
+          "[bindings] Umbrella build with QuickJS enabled requires a QuickJS target "
+          "to be provided by the root project.")
+    endif()
+
+    return()
+  endif()
+
+  find_package(quickjs CONFIG QUIET)
+
+  if(TARGET quickjs)
+    return()
+  endif()
+
+  if(NOT KORDEX_BINDINGS_FETCH_QUICKJS)
+    message(FATAL_ERROR
+        "[bindings] QuickJS backend is enabled but QuickJS was not found.\n"
+        "Install QuickJS, provide a CMake target named 'quickjs', "
+        "or enable KORDEX_BINDINGS_FETCH_QUICKJS.")
+  endif()
+
+  include(FetchContent)
+
+  message(STATUS "[bindings] Fetching QuickJS")
+
+  FetchContent_Declare(
+      quickjs
+      GIT_REPOSITORY ${KORDEX_QUICKJS_GIT_REPOSITORY}
+      GIT_TAG ${KORDEX_QUICKJS_GIT_TAG}
+      GIT_SHALLOW TRUE)
+
+  FetchContent_MakeAvailable(quickjs)
+
+  set(KORDEX_QUICKJS_SOURCE_DIR "${quickjs_SOURCE_DIR}")
+
+  add_library(kordex_quickjs STATIC
+      "${KORDEX_QUICKJS_SOURCE_DIR}/quickjs.c"
+      "${KORDEX_QUICKJS_SOURCE_DIR}/libregexp.c"
+      "${KORDEX_QUICKJS_SOURCE_DIR}/libunicode.c"
+      "${KORDEX_QUICKJS_SOURCE_DIR}/cutils.c")
+
+  target_include_directories(kordex_quickjs
+      PUBLIC
+        "${KORDEX_QUICKJS_SOURCE_DIR}")
+
+  target_compile_definitions(kordex_quickjs
+      PRIVATE
+        CONFIG_VERSION="kordex")
+
+  target_compile_options(kordex_quickjs
+      PRIVATE
+        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-parameter>
+        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-missing-field-initializers>
+        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-sign-compare>
+        $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-function>)
+
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(kordex_quickjs
+        PUBLIC
+          m)
+  endif()
+
+  add_library(quickjs ALIAS kordex_quickjs)
+endfunction()
+
 # --------------------------------------------------------------------
 # Dependencies
 # --------------------------------------------------------------------
@@ -123,11 +199,24 @@ kordex_bindings_require_target(
     https://github.com/vixcpp/json.git
     ${KORDEX_VIX_GIT_TAG})
 
+kordex_bindings_setup_quickjs()
+
 set(KORDEX_BINDINGS_DEPENDENCIES
     kordex::runtime
     vix::error
     vix::log
     vix::json)
+
+if(KORDEX_BINDINGS_ENABLE_QUICKJS)
+  if(TARGET quickjs)
+    list(APPEND KORDEX_BINDINGS_DEPENDENCIES quickjs)
+  elseif(TARGET kordex_quickjs)
+    list(APPEND KORDEX_BINDINGS_DEPENDENCIES kordex_quickjs)
+  else()
+    message(FATAL_ERROR
+        "[bindings] QuickJS backend is enabled but no QuickJS target is available.")
+  endif()
+endif()
 
 # --------------------------------------------------------------------
 # Sources

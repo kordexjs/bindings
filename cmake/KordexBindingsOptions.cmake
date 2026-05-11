@@ -21,6 +21,23 @@ option(KORDEX_BINDINGS_BUILD_TESTS "Build Kordex Bindings tests" OFF)
 option(KORDEX_BINDINGS_BUILD_EXAMPLES "Build Kordex Bindings examples" OFF)
 
 # --------------------------------------------------------------------
+# QuickJS options
+# --------------------------------------------------------------------
+set(KORDEX_QUICKJS_GIT_REPOSITORY
+    "https://github.com/bellard/quickjs.git"
+    CACHE STRING
+    "Git repository used for QuickJS")
+
+set(KORDEX_QUICKJS_GIT_TAG
+    "master"
+    CACHE STRING
+    "Git tag or branch used for QuickJS")
+
+option(KORDEX_BINDINGS_FETCH_QUICKJS
+    "Auto-fetch QuickJS when QuickJS backend is enabled"
+    ON)
+
+# --------------------------------------------------------------------
 # Install options
 # --------------------------------------------------------------------
 option(KORDEX_BINDINGS_ENABLE_INSTALL
@@ -87,6 +104,7 @@ if(DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD)
   set(KORDEX_BINDINGS_FETCH_KORDEX_DEPS OFF CACHE BOOL "Auto-fetch missing Kordex dependencies" FORCE)
   set(KORDEX_BINDINGS_FETCH_VIX_DEPS OFF CACHE BOOL "Auto-fetch missing Vix dependencies" FORCE)
   set(KORDEX_BINDINGS_FETCH_TESTS OFF CACHE BOOL "Auto-fetch vix::tests if missing" FORCE)
+  set(KORDEX_BINDINGS_FETCH_QUICKJS OFF CACHE BOOL "Auto-fetch QuickJS when QuickJS backend is enabled" FORCE)
 
   set(KORDEX_BINDINGS_FETCH_RUNTIME OFF CACHE BOOL "Auto-fetch kordex::runtime if missing" FORCE)
   set(KORDEX_BINDINGS_FETCH_ERROR OFF CACHE BOOL "Auto-fetch vix::error if missing" FORCE)
