@@ -1,13 +1,13 @@
 {
   "dependencies": [
     {
-      "commit": "757686a639808882eb83ce14411ac52a372a83c7",
-      "hash": "29456ce30978ca7af36c576e1d1231e339ad05e5f5f38290cf01911e4c45fed0",
+      "commit": "375cacf6eff8d5bb85e7f21be7605b5d01529203",
+      "hash": "813219fde6a7c5b603d284ea2194571e18efde640796a43726bd50c5289d6fe5",
       "id": "softadastra/kordex-runtime",
       "repo": "https://github.com/softadastra/kordex-runtime",
-      "requested": "0.1.0",
-      "tag": "v0.1.0",
-      "version": "0.1.0"
+      "requested": "0.1.2",
+      "tag": "v0.1.2",
+      "version": "0.1.2"
     }
   ],
   "lockVersion": 1
