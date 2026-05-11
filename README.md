@@ -2,171 +2,327 @@
 
 Native bindings layer for Kordex.
 
-`kordex::bindings` connects the Kordex runtime to script execution. It provides the C++ abstraction layer for engines, contexts, values, functions, native modules, module registries, scripts, and runtime bridging.
+Kordex Bindings connects the Kordex runtime to a real JavaScript engine.
+It provides the engine abstraction, script execution API, native module bridge, value conversion layer, module loading, TypeScript loading, and the bridge used to expose C++ functions to JavaScript.
 
-The current implementation includes a native placeholder engine. It validates the architecture and public API before connecting a real JavaScript backend such as QuickJS or V8.
+## Role
 
-## Purpose
+`kordex-bindings` is the execution bridge between:
 
-Kordex Bindings is responsible for:
+- `kordex-runtime`
+- JavaScript engine backends
+- `kordex-std`
+- native C++ modules
+- user scripts
 
-- exposing C++ functions to scripts
-- exposing native modules to scripts
-- representing script values in C++
-- managing engine contexts
-- running scripts through a stable public API
-- bridging `kordex::runtime` with `kordex::bindings`
-- preparing the integration point for future JavaScript engines
-
-The dependency direction is:
-
-```txt
-kordex::bindings
-  -> kordex::runtime
-  -> vix modules
-```
-
-`kordex::runtime` must never depend on `kordex::bindings`.
-
-## Module role
-
-The bindings module sits above runtime:
-
-```
-runtime
-  loads files
-  resolves modules
-  manages process/task/timer/config/source files
-
-bindings
-  exposes runtime to script engines
-  converts C++ values to script-facing values
-  registers native modules
-  executes scripts through Engine and EngineContext
-```
+It is responsible for turning a Kordex script into something executable by the selected JavaScript backend.
 
 ## Features
 
 - Engine abstraction
-- Engine context
-- Script representation
-- Script result model
-- Binding result model
-- Generic value model
-- Function wrapper
-- Native function wrapper
-- Object representation
-- Native module support
-- Module registry
-- Runtime bridge
-- Public umbrella header
-- Examples
-- Tests
-
-## Current backend
-
-The current backend is a native placeholder backend.
-
-It does not execute JavaScript yet. Instead, it validates the full bindings architecture and returns predictable placeholder results.
-
-Example:
-
-```cpp
-auto result = kordex::bindings::run_source(
-    "console.log('Hello from Kordex bindings');",
-    "hello.js");
-```
-
-The placeholder engine returns the source as a string value.
-
-This makes the public API testable before QuickJS or V8 is added.
+- QuickJS backend support
+- Native placeholder backend
+- Script loading and execution
+- JavaScript `eval()`
+- TypeScript loading and basic transpilation
+- Static import loading
+- Relative import resolution
+- JSON module loading
+- Built-in module imports such as `kordex:path`
+- Native module registry
+- Native function bridge
+- C++ value conversion to JavaScript values
+- JavaScript arguments conversion to C++ values
+- Module cache
+- Runtime bridge foundation
+- Source-map-ready script pipeline
 
 ## Public headers
 
-```
+```txt
 include/kordex/bindings/
-├── Version.hpp
-├── Error.hpp
-├── Result.hpp
-├── BindingOptions.hpp
 ├── BindingConfig.hpp
+├── BindingOptions.hpp
 ├── BindingResult.hpp
-├── ValueType.hpp
-├── Value.hpp
+├── Bindings.hpp
+├── Engine.hpp
+├── EngineContext.hpp
+├── Error.hpp
 ├── Function.hpp
-├── Object.hpp
+├── Module.hpp
+├── ModuleLoader.hpp
+├── ModuleRegistry.hpp
 ├── NativeFunction.hpp
 ├── NativeModule.hpp
-├── Module.hpp
-├── ModuleRegistry.hpp
-├── ScriptResult.hpp
-├── Script.hpp
-├── EngineContext.hpp
-├── Engine.hpp
+├── Object.hpp
+├── Result.hpp
 ├── RuntimeBridge.hpp
-└── Bindings.hpp
+├── Script.hpp
+├── ScriptResult.hpp
+├── TypeScriptLoader.hpp
+├── Value.hpp
+├── ValueType.hpp
+├── Version.hpp
+└── backend/
+    ├── BackendDriver.hpp
+    └── QuickJsBackendDriver.hpp
 ```
 
-## Main concepts
+## Engine backends
 
-### Engine
-
-`Engine` is the top-level bindings facade.
-
-It owns:
-
-- bindings configuration
-- lifecycle state
-- a default `EngineContext`
-
-Example:
+Kordex Bindings supports multiple backend modes.
 
 ```cpp
-auto engine_result = kordex::bindings::create_engine();
-if (!engine_result)
+enum class EngineBackend
+{
+  Native,
+  QuickJS,
+  V8
+};
+```
+
+Current practical backend:
+
+- QuickJS
+
+The native backend remains useful as a minimal placeholder or test backend.
+
+## Build options
+
+The backend is selected through CMake options:
+
+- `KORDEX_BINDINGS_ENABLE_NATIVE_ENGINE`
+- `KORDEX_BINDINGS_ENABLE_QUICKJS`
+- `KORDEX_BINDINGS_ENABLE_V8`
+
+Example with QuickJS:
+
+```bash
+cmake -S . -B build-quickjs -G Ninja \
+  -DKORDEX_BINDINGS_ENABLE_QUICKJS=ON \
+  -DKORDEX_BINDINGS_ENABLE_NATIVE_ENGINE=OFF
+
+cmake --build build-quickjs
+```
+
+Only one real JavaScript backend should be enabled at a time.
+
+## Basic usage
+
+Create an engine:
+
+```cpp
+#include <kordex/bindings/Bindings.hpp>
+
+int main()
+{
+  auto engine_result = kordex::bindings::create_engine();
+
+  if (!engine_result)
+  {
+    return 1;
+  }
+
+  auto engine = std::move(engine_result.value());
+
+  auto init = engine.initialize();
+  if (!init.succeeded())
+  {
+    return init.exit_code;
+  }
+
+  auto result = engine.eval("1 + 2", "main.js");
+
+  engine.shutdown();
+
+  return result.exit_code;
+}
+```
+
+## Evaluate JavaScript
+
+```cpp
+auto result = engine.eval(
+    "const x = 40 + 2; x;",
+    "main.js");
+
+if (result.succeeded())
+{
+  std::cout << result.value.display() << "\n";
+}
+```
+
+Expected value:
+```
+42
+```
+## Script loading
+
+Scripts can be loaded from source or from disk.
+
+```cpp
+auto script = kordex::bindings::Script::load("main.js");
+
+if (!script)
 {
   return 1;
 }
 
-auto engine = std::move(engine_result.value());
-
-auto init_result = engine.initialize();
-if (!init_result.succeeded())
-{
-  return init_result.exit_code;
-}
+auto result = engine.run_script(script.value());
 ```
 
-### EngineContext
+Supported script types:
 
-`EngineContext` owns:
+- `.js`
+- `.mjs`
+- `.cjs`
+- `.ts`
+- `.mts`
+- `.cts`
+- `.json`
 
-- global values
-- global functions
-- module registry
-- script evaluation state
+## TypeScript support
+
+Kordex Bindings includes a minimal TypeScript loader.
+
+It supports:
+
+- `.ts`
+- `.mts`
+- `.cts`
+- simple type stripping
+- basic syntax checks
+- transformation to JavaScript before execution
 
 Example:
 
-```cpp
-kordex::bindings::EngineContext context;
+```typescript
+const name: string = "Kordex";
 
-auto error = context.initialize();
-if (error)
-{
-  return 1;
+function hello(value: string): string {
+  return "Hello " + value;
 }
 
-context.set_global(
-    "answer",
-    kordex::bindings::Value::number(42.0));
+hello(name);
 ```
 
-### Value
+The TypeScript loader transforms this into JavaScript before sending it to QuickJS.
 
-`Value` is the engine-independent value type used across the bindings boundary.
+## Module loading
 
-Supported primitive value types:
+Kordex Bindings includes a static module loader.
+
+It supports:
+
+- relative imports
+- extension resolution
+- directory index.js
+- JSON imports
+- TypeScript imports
+- built-in module imports
+- module cache
+
+Example:
+
+```javascript
+import { message } from "./lib/message.js";
+
+message;
+```
+
+Extension-less imports are supported:
+
+```javascript
+import { message } from "./lib/message";
+```
+
+Directory imports are supported:
+
+```javascript
+import { name } from "./pkg";
+```
+
+This resolves:
+```
+./pkg/index.js
+```
+
+## JSON modules
+
+JSON imports are supported:
+
+```javascript
+import user from "./user.json";
+
+user.name;
+```
+
+The JSON module is converted internally to:
+
+```javascript
+exports.default = JSON.parse(...);
+```
+
+## Built-in modules
+
+Built-in Kordex modules use the `kordex:` prefix.
+
+Example:
+
+```javascript
+import { join } from "kordex:path";
+
+join("/tmp", "kordex", "app");
+```
+
+Built-in modules are resolved from the engine context module registry.
+
+The standard modules are installed by `kordex-std` or by the CLI before script execution.
+
+## Native modules
+
+A native module is a C++ module exposed to JavaScript.
+
+```cpp
+kordex::bindings::NativeModule module("example");
+
+module.set_function(
+    kordex::bindings::NativeFunction::create(
+        "hello",
+        [](const kordex::bindings::NativeFunctionArguments &args)
+            -> kordex::bindings::Result<kordex::bindings::Value>
+        {
+          (void)args;
+          return kordex::bindings::Value::string("Hello from C++");
+        }));
+```
+
+Then JavaScript can import and call it when installed:
+
+```javascript
+import { hello } from "kordex:example";
+
+hello();
+```
+
+## Native function bridge
+
+Kordex Bindings exposes native C++ functions to JavaScript through an internal bridge.
+
+The generated JavaScript module calls:
+
+```javascript
+__kordex_call_native(moduleName, functionName, ...args)
+```
+
+The QuickJS backend then:
+
+1. Converts JavaScript arguments to `kordex::bindings::Value`
+2. Looks up the native module from `EngineContext`
+3. Calls the native function
+4. Converts the C++ result back to a QuickJS value
+
+Supported value types:
 
 - `undefined`
 - `null`
@@ -174,205 +330,233 @@ Supported primitive value types:
 - `number`
 - `string`
 
-Object, function, native function, and module are represented at the type level and will be expanded when the real engine backend is connected.
+Object and function support can be expanded later.
+
+## Value system
+
+`Value` is the engine-independent value transported across the bindings layer.
+
+```cpp
+Value::undefined();
+Value::null();
+Value::boolean(true);
+Value::number(42.0);
+Value::string("Kordex");
+```
 
 Example:
 
 ```cpp
-auto value = kordex::bindings::Value::number(42.0);
+auto value = kordex::bindings::Value::string("hello");
 
-auto number = value.as_number();
-if (!number)
+if (value.is_string())
 {
-  return 1;
+  auto text = value.as_string();
 }
 ```
 
-### Function
+## Module registry
 
-`Function` wraps a callable C++ callback.
-
-Example:
-
-```cpp
-auto add = kordex::bindings::Function::create(
-    "add",
-    [](const kordex::bindings::FunctionArguments &args)
-        -> kordex::bindings::Result<kordex::bindings::Value>
-    {
-      auto left = args[0].as_number();
-      if (!left)
-      {
-        return left.error();
-      }
-
-      auto right = args[1].as_number();
-      if (!right)
-      {
-        return right.error();
-      }
-
-      return kordex::bindings::Value::number(
-          left.value() + right.value());
-    });
-```
-
-### NativeFunction
-
-`NativeFunction` is a C++ function intended to be exposed to scripts.
-
-It stores:
-
-- name
-- module name
-- description
-- argument limits
-- safety flag
-- callback
-
-### NativeModule
-
-`NativeModule` groups native functions and constant values.
-
-Example:
-
-```cpp
-auto module = kordex::bindings::NativeModule::create("math");
-
-module.set_value(
-    "version",
-    kordex::bindings::Value::string("0.1.0"));
-
-module.add_function(add_function);
-```
-
-### Module
-
-`Module` is the generic module representation used by the bindings layer.
-
-It can represent:
-
-- native modules
-- script modules
-- builtin modules
-
-### ModuleRegistry
-
-`ModuleRegistry` stores modules visible to an engine context.
+`ModuleRegistry` stores modules visible to the bindings layer.
 
 It supports:
 
 - registering modules
 - registering native modules
 - importing modules
-- filtering modules by kind
-- permission policies
-
-### Script
-
-`Script` stores source code and metadata.
-
-Supported script types:
-
-- `javascript`
-- `typescript`
-- `json`
-
-Only JavaScript and TypeScript are executable in the placeholder execution model.
+- removing modules
+- listing modules by name
+- listing modules by kind
 
 Example:
 
 ```cpp
-auto script = kordex::bindings::Script::from_source(
-    "console.log('hello');",
-    "hello.js");
+kordex::bindings::ModuleRegistry registry;
 
-auto result = script.run();
-```
+auto error = registry.register_native_module(native_module);
 
-### RuntimeBridge
-
-`RuntimeBridge` connects `kordex::runtime` to `kordex::bindings`.
-
-It can:
-
-- load source files through runtime
-- convert runtime source files to scripts
-- resolve runtime modules
-- convert resolved modules to bindings modules
-- install runtime state into an engine context
-- run runtime-backed placeholder execution
-
-Example:
-
-```cpp
-auto bridge_result = kordex::bindings::create_runtime_bridge();
-if (!bridge_result)
+if (error)
 {
   return 1;
 }
 
-auto bridge = std::move(bridge_result.value());
+auto module = registry.import_module("fs");
+```
 
-auto init_result = bridge.initialize();
-if (!init_result.succeeded())
+## Engine context
+
+`EngineContext` owns:
+
+- binding configuration
+- initialization state
+- module registry
+- runtime bridge state
+
+It is passed to backend drivers during initialization and execution.
+
+```cpp
+kordex::bindings::EngineContext context(config);
+
+auto error = context.initialize();
+```
+
+## Binding options
+
+Use `BindingOptions` to configure an engine before creation.
+
+```cpp
+kordex::bindings::BindingOptions options;
+
+options.backend = kordex::bindings::EngineBackend::QuickJS;
+options.module_policy = kordex::bindings::ModulePolicy::Full;
+options.allow_native_modules = true;
+options.allow_native_functions = true;
+options.allow_runtime_bridge = true;
+options.diagnostics = true;
+options.debug = true;
+options.source_maps = true;
+```
+
+Then:
+
+```cpp
+auto engine = kordex::bindings::Engine::create(options);
+```
+
+## Binding config
+
+`BindingConfig` is the normalized configuration used internally.
+
+It is created from options:
+
+```cpp
+auto config = kordex::bindings::BindingConfig::from_options(options);
+```
+
+It validates:
+
+- engine name
+- environment
+- module policy
+- native module permissions
+- native function permissions
+
+## Error handling
+
+Kordex Bindings uses `Result<T>` and structured errors instead of exceptions for recoverable failures.
+
+```cpp
+auto result = engine.eval("throw new Error('boom')", "error.js");
+
+if (result.failed())
 {
-  return init_result.exit_code;
+  std::cerr << result.error.message() << "\n";
 }
 ```
 
-## Build
+JavaScript errors are converted into `ScriptResult::failure(...)`.
+
+Expected message:
+```
+Error: boom
+```
+
+## ScriptResult
+
+`ScriptResult` stores:
+
+- execution status
+- exit code
+- structured error
+- returned value
+- stdout text
+- stderr text
+
+```cpp
+if (result.succeeded())
+{
+  std::cout << result.value.display() << "\n";
+}
+
+if (result.failed())
+{
+  std::cerr << result.error.message() << "\n";
+}
+```
+
+## BindingResult
+
+`BindingResult` is used for engine-level operations:
+
+- initialization
+- shutdown
+- context creation
+- backend setup
+
+```cpp
+auto init = engine.initialize();
+
+if (!init.succeeded())
+{
+  return init.exit_code;
+}
+```
+
+## ModuleLoader pipeline
+
+The module loader pipeline is:
+
+1. Script
+2. -> TypeScriptLoader if `.ts`/`.mts`/`.cts`
+3. -> ModuleResolver for relative imports
+4. -> JSON module conversion
+5. -> builtin module conversion
+6. -> CommonJS-like bundle generation
+7. -> QuickJS eval
+
+## TypeScriptLoader pipeline
+
+The TypeScript loader pipeline is:
+
+1. TypeScript source
+2. -> basic check
+3. -> strip type-only syntax
+4. -> emit JavaScript Script
+
+This is intentionally an MVP. A full TypeScript compiler can replace this layer later without changing the public API.
+
+## QuickJS backend
+
+The QuickJS backend is responsible for:
+
+- creating `JSRuntime`
+- creating `JSContext`
+- evaluating JavaScript
+- collecting returned values
+- formatting JavaScript exceptions
+- exposing the native bridge
+- converting values between QuickJS and Kordex
+
+## Build from source
 
 From the module directory:
 
 ```bash
-vix build --build-target all -v
-```
-
-Or with CMake:
-
-```bash
-cmake -S . -B build-ninja -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DKORDEX_BINDINGS_BUILD_TESTS=ON \
-  -DKORDEX_BINDINGS_BUILD_EXAMPLES=ON
-
+cmake -S . -B build-ninja -G Ninja
 cmake --build build-ninja
 ```
 
-## Build options
+With QuickJS enabled:
 
-```
-KORDEX_BINDINGS_BUILD_TESTS=OFF
-KORDEX_BINDINGS_BUILD_EXAMPLES=OFF
-KORDEX_BINDINGS_ENABLE_WARNINGS=ON
-KORDEX_BINDINGS_ENABLE_SANITIZERS=OFF
+```bash
+cmake -S . -B build-quickjs -G Ninja \
+  -DKORDEX_BINDINGS_ENABLE_QUICKJS=ON \
+  -DKORDEX_BINDINGS_ENABLE_NATIVE_ENGINE=OFF
 
-KORDEX_BINDINGS_ENABLE_NATIVE_ENGINE=ON
-KORDEX_BINDINGS_ENABLE_QUICKJS=OFF
-KORDEX_BINDINGS_ENABLE_V8=OFF
-
-KORDEX_BINDINGS_FETCH_RUNTIME=ON
-KORDEX_BINDINGS_FETCH_ERROR=ON
-KORDEX_BINDINGS_FETCH_LOG=ON
-KORDEX_BINDINGS_FETCH_JSON=ON
-KORDEX_BINDINGS_FETCH_TESTS=ON
-
-KORDEX_VIX_GIT_TAG=main
-KORDEX_RUNTIME_GIT_TAG=main
+cmake --build build-quickjs
 ```
 
-Only one real JavaScript backend should be enabled at a time.
-
-For now, the default backend is:
-
-```
-native
-```
-
-## Tests
-
-Enable tests:
+With tests:
 
 ```bash
 cmake -S . -B build-ninja -G Ninja \
@@ -382,120 +566,78 @@ cmake --build build-ninja
 ctest --test-dir build-ninja --output-on-failure
 ```
 
-Test files:
-
-```
-tests/
-├── test_version.cpp
-├── test_error.cpp
-├── test_binding_options.cpp
-├── test_binding_config.cpp
-├── test_binding_result.cpp
-├── test_value.cpp
-├── test_function.cpp
-├── test_object.cpp
-├── test_native_function.cpp
-├── test_native_module.cpp
-├── test_module.cpp
-├── test_module_registry.cpp
-├── test_script_result.cpp
-├── test_script.cpp
-├── test_engine_context.cpp
-├── test_engine.cpp
-└── test_runtime_bridge.cpp
-```
-
 ## Examples
 
-Build examples:
+Evaluate JavaScript:
 
 ```bash
-cmake -S . -B build-ninja -G Ninja \
-  -DKORDEX_BINDINGS_BUILD_EXAMPLES=ON
-
-cmake --build build-ninja
+./build-ninja/examples/eval_script
 ```
 
-Examples:
+Run a script:
 
-```
-examples/
-├── create_engine.cpp
-├── run_script.cpp
-├── expose_function.cpp
-├── expose_module.cpp
-└── bridge_runtime.cpp
+```bash
+./build-ninja/examples/run_script
 ```
 
-Run example binaries from the build directory.
+Use native modules:
 
-## Public umbrella include
-
-Use:
-
-```cpp
-#include <kordex/bindings/Bindings.hpp>
+```bash
+./build-ninja/examples/native_module
 ```
 
-This includes the full public bindings API.
+## Tests
 
-## Quick example
+The bindings tests should cover:
 
-```cpp
-#include <iostream>
+- engine creation
+- engine initialization
+- JavaScript evaluation
+- JavaScript errors
+- TypeScript loading
+- module imports
+- JSON modules
+- native modules
+- native functions
+- value conversion
+- module registry
+- backend shutdown
 
-#include <kordex/bindings/Bindings.hpp>
+Run:
 
-int main()
-{
-  auto result = kordex::bindings::run_source(
-      "console.log('Hello from Kordex');",
-      "hello.js");
-
-  if (!result.succeeded())
-  {
-    std::cerr << result.error.message() << '\n';
-    return result.exit_code;
-  }
-
-  auto value = result.value.as_string();
-  if (!value)
-  {
-    std::cerr << value.error().message() << '\n';
-    return 1;
-  }
-
-  std::cout << value.value() << '\n';
-
-  return 0;
-}
+```bash
+ctest --test-dir build-ninja --output-on-failure
 ```
 
-## Design rule
+## Current limitations
 
-Bindings owns script-facing abstractions.
+- TypeScript support is MVP-level and does not replace the official TypeScript compiler
+- Source maps are prepared at the build layer, but detailed line/column mappings are still future work
+- Object and function value conversion is not fully exposed yet
+- Package imports are not connected yet
+- Native ES module execution is not used directly yet
+- The current module loader emits a CommonJS-like bundle for QuickJS evaluation
 
-Runtime owns runtime behavior.
+## Module role in Kordex
 
-- `bindings` may depend on `runtime`
-- `runtime` must not depend on `bindings`
+`kordex-bindings` is not the CLI and not the standard library.
 
-This keeps Kordex modular and prevents circular dependencies.
+It is the bridge that makes this possible:
 
-## Roadmap
+```bash
+kordex run main.ts
+```
 
-Next steps:
+Internally:
 
-- connect QuickJS backend
-- add real script compilation
-- add real script execution
-- represent callable values inside `Value`
-- expose native modules to the JavaScript backend
-- support module imports from scripts
-- connect runtime module resolver to engine imports
-- expose Kordex APIs as builtin modules
-- add TypeScript transpilation strategy
-- improve diagnostics and stack traces
+1. CLI
+2. -> Runtime options
+3. -> Bindings engine
+4. -> Module loader
+5. -> TypeScript loader
+6. -> QuickJS backend
+7. -> Native std modules
+8. -> ScriptResult
 
 ## License
 
