@@ -235,25 +235,26 @@ endif()
 # --------------------------------------------------------------------
 # Install
 # --------------------------------------------------------------------
-install(
-    TARGETS kordex_bindings
-    EXPORT ${KORDEX_BINDINGS_EXPORT_SET}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-install(
-    DIRECTORY include/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILES_MATCHING
-      PATTERN "*.hpp"
-      PATTERN "*.h")
-
-# --------------------------------------------------------------------
-# Standalone package config/export
-# --------------------------------------------------------------------
 if(NOT (DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD))
+
+  install(
+      TARGETS kordex_bindings
+      EXPORT kordex_bindingsTargets
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+  install(
+      DIRECTORY include/
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+      FILES_MATCHING
+        PATTERN "*.hpp"
+        PATTERN "*.h")
+
+  # --------------------------------------------------------------------
+  # Standalone package config/export
+  # --------------------------------------------------------------------
   configure_package_config_file(
       "${CMAKE_CURRENT_SOURCE_DIR}/cmake/KordexBindingsConfig.cmake.in"
       "${CMAKE_CURRENT_BINARY_DIR}/kordex_bindingsConfig.cmake"
@@ -276,8 +277,8 @@ if(NOT (DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD))
       FILE kordex_bindingsTargets.cmake
       NAMESPACE kordex::
       DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/kordex_bindings")
-endif()
 
+endif()
 # --------------------------------------------------------------------
 # Summary
 # --------------------------------------------------------------------
