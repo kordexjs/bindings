@@ -1,6 +1,6 @@
 /**
  *
- *  @file NativeBackendDriver.cpp
+ *  @file QuickJsBackendDriver.hpp
  *  @author Softadastra
  *
  *  Copyright 2026, Softadastra.
@@ -14,54 +14,55 @@
  *
  */
 
-#include <utility>
+#ifndef KORDEX_BINDINGS_BACKEND_QUICKJS_BACKEND_DRIVER_HPP
+#define KORDEX_BINDINGS_BACKEND_QUICKJS_BACKEND_DRIVER_HPP
 
-#include <kordex/bindings/backend/NativeBackendDriver.hpp>
+#include <kordex/bindings/backend/EngineBackendDriver.hpp>
 
 namespace kordex::bindings
 {
-  BindingResult NativeBackendDriver::initialize(
-      EngineContext &context)
+  /**
+   * @class QuickJsBackendDriver
+   * @brief QuickJS-backed JavaScript engine driver.
+   *
+   * This driver owns a QuickJS runtime and context when QuickJS support is
+   * enabled at build time.
+   */
+  class QuickJsBackendDriver final : public EngineBackendDriver
   {
-    (void)context;
+  public:
+    QuickJsBackendDriver();
 
-    return BindingResult::success("native backend initialized");
-  }
+    QuickJsBackendDriver(const QuickJsBackendDriver &) = delete;
+    QuickJsBackendDriver &operator=(const QuickJsBackendDriver &) = delete;
 
-  BindingResult NativeBackendDriver::shutdown(
-      EngineContext &context)
-  {
-    (void)context;
+    QuickJsBackendDriver(QuickJsBackendDriver &&) noexcept = delete;
+    QuickJsBackendDriver &operator=(QuickJsBackendDriver &&) noexcept = delete;
 
-    return BindingResult::success("native backend stopped");
-  }
+    ~QuickJsBackendDriver() override;
 
-  ScriptResult NativeBackendDriver::run_script(
-      EngineContext &context,
-      Script script)
-  {
-    if (!context.initialized())
-    {
-      return ScriptResult::failure(
-          make_binding_error(
-              BindingErrorCode::ContextUnavailable,
-              "engine context is not initialized"),
-          1);
-    }
+    [[nodiscard]] BindingResult initialize(
+        EngineContext &context) override;
 
-    return script.run();
-  }
+    [[nodiscard]] BindingResult shutdown(
+        EngineContext &context) override;
 
-  ScriptResult NativeBackendDriver::eval(
-      EngineContext &context,
-      std::string source,
-      std::string name)
-  {
-    Script script = Script::from_source(
-        std::move(source),
-        std::move(name));
+    [[nodiscard]] ScriptResult run_script(
+        EngineContext &context,
+        Script script) override;
 
-    return run_script(context, std::move(script));
-  }
+    [[nodiscard]] ScriptResult eval(
+        EngineContext &context,
+        std::string source,
+        std::string name) override;
+
+  private:
+    [[nodiscard]] bool initialized() const noexcept;
+
+    void *runtime_{nullptr};
+    void *context_{nullptr};
+  };
 
 } // namespace kordex::bindings
+
+#endif // KORDEX_BINDINGS_BACKEND_QUICKJS_BACKEND_DRIVER_HPP

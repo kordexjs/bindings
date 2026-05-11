@@ -1,0 +1,335 @@
+/**
+ *
+ *  @file QuickJsBackendDriver.cpp
+ *  @author Softadastra
+ *
+ *  Copyright 2026, Softadastra.
+ *  All rights reserved.
+ *  https://github.com/softadastra/kordex-bindings
+ *
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the LICENSE file.
+ *
+ *  Kordex Bindings
+ *
+ */
+
+#include <string>
+#include <utility>
+
+#include <kordex/bindings/backend/QuickJsBackendDriver.hpp>
+
+#if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+#include <quickjs.h>
+#endif
+
+namespace kordex::bindings
+{
+#if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+
+  namespace
+  {
+    [[nodiscard]] JSRuntime *as_runtime(void *runtime) noexcept
+    {
+      return static_cast<JSRuntime *>(runtime);
+    }
+
+    [[nodiscard]] JSContext *as_context(void *context) noexcept
+    {
+      return static_cast<JSContext *>(context);
+    }
+
+    [[nodiscard]] std::string quickjs_exception_message(JSContext *context)
+    {
+      JSValue exception = JS_GetException(context);
+
+      const char *message = JS_ToCString(context, exception);
+      std::string result = message ? message : "JavaScript exception";
+
+      if (message)
+      {
+        JS_FreeCString(context, message);
+      }
+
+      JS_FreeValue(context, exception);
+
+      return result;
+    }
+
+    [[nodiscard]] Result<Value> quickjs_value_to_binding_value(
+        JSContext *context,
+        JSValue value)
+    {
+      if (JS_IsUndefined(value))
+      {
+        return Value::undefined();
+      }
+
+      if (JS_IsNull(value))
+      {
+        return Value::null();
+      }
+
+      if (JS_IsBool(value))
+      {
+        return Value::boolean(JS_ToBool(context, value) != 0);
+      }
+
+      if (JS_IsNumber(value))
+      {
+        double number = 0.0;
+
+        if (JS_ToFloat64(context, &number, value) < 0)
+        {
+          return make_binding_error(
+              BindingErrorCode::ValueConversionFailed,
+              quickjs_exception_message(context));
+        }
+
+        return Value::number(number);
+      }
+
+      if (JS_IsString(value))
+      {
+        const char *text = JS_ToCString(context, value);
+        if (!text)
+        {
+          return make_binding_error(
+              BindingErrorCode::ValueConversionFailed,
+              quickjs_exception_message(context));
+        }
+
+        std::string result(text);
+        JS_FreeCString(context, text);
+
+        return Value::string(std::move(result));
+      }
+
+      const char *text = JS_ToCString(context, value);
+      if (!text)
+      {
+        return Value::string("[object]");
+      }
+
+      std::string result(text);
+      JS_FreeCString(context, text);
+
+      return Value::string(std::move(result));
+    }
+
+    [[nodiscard]] ScriptResult make_quickjs_failure(
+        JSContext *context)
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::ScriptExecutionFailed,
+              quickjs_exception_message(context)),
+          1);
+    }
+  } // namespace
+
+#endif
+
+  QuickJsBackendDriver::QuickJsBackendDriver()
+      : runtime_(nullptr),
+        context_(nullptr)
+  {
+  }
+
+  QuickJsBackendDriver::~QuickJsBackendDriver()
+  {
+#if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+    if (context_)
+    {
+      JS_FreeContext(as_context(context_));
+      context_ = nullptr;
+    }
+
+    if (runtime_)
+    {
+      JS_FreeRuntime(as_runtime(runtime_));
+      runtime_ = nullptr;
+    }
+#endif
+  }
+
+  BindingResult QuickJsBackendDriver::initialize(
+      EngineContext &context)
+  {
+    (void)context;
+
+#if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+    if (initialized())
+    {
+      return BindingResult::success("QuickJS backend already initialized");
+    }
+
+    JSRuntime *runtime = JS_NewRuntime();
+    if (!runtime)
+    {
+      return BindingResult::failure(
+          make_binding_error(
+              BindingErrorCode::EngineInitializationFailed,
+              "failed to create QuickJS runtime"),
+          1);
+    }
+
+    JSContext *quickjs_context = JS_NewContext(runtime);
+    if (!quickjs_context)
+    {
+      JS_FreeRuntime(runtime);
+
+      return BindingResult::failure(
+          make_binding_error(
+              BindingErrorCode::EngineInitializationFailed,
+              "failed to create QuickJS context"),
+          1);
+    }
+
+    runtime_ = runtime;
+    context_ = quickjs_context;
+
+    return BindingResult::success("QuickJS backend initialized");
+#else
+    return BindingResult::failure(
+        make_binding_error(
+            BindingErrorCode::EngineUnavailable,
+            "QuickJS backend is disabled in this build"),
+        1);
+#endif
+  }
+
+  BindingResult QuickJsBackendDriver::shutdown(
+      EngineContext &context)
+  {
+    (void)context;
+
+#if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+    if (context_)
+    {
+      JS_FreeContext(as_context(context_));
+      context_ = nullptr;
+    }
+
+    if (runtime_)
+    {
+      JS_FreeRuntime(as_runtime(runtime_));
+      runtime_ = nullptr;
+    }
+
+    return BindingResult::success("QuickJS backend stopped");
+#else
+    return BindingResult::success("QuickJS backend stopped");
+#endif
+  }
+
+  ScriptResult QuickJsBackendDriver::run_script(
+      EngineContext &engine_context,
+      Script script)
+  {
+    if (!engine_context.initialized())
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::ContextUnavailable,
+              "engine context is not initialized"),
+          1);
+    }
+
+    const auto validation = script.validate();
+    if (validation)
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::ScriptExecutionFailed,
+              std::string(validation.message())),
+          1);
+    }
+
+    if (!script.executable())
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::ScriptExecutionFailed,
+              "script type is not executable"),
+          1);
+    }
+
+    return eval(
+        engine_context,
+        script.source(),
+        script.name().empty() ? "main.js" : script.name());
+  }
+
+  ScriptResult QuickJsBackendDriver::eval(
+      EngineContext &engine_context,
+      std::string source,
+      std::string name)
+  {
+    if (!engine_context.initialized())
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::ContextUnavailable,
+              "engine context is not initialized"),
+          1);
+    }
+
+#if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+    if (!initialized())
+    {
+      return ScriptResult::failure(
+          make_binding_error(
+              BindingErrorCode::EngineUnavailable,
+              "QuickJS backend is not initialized"),
+          1);
+    }
+
+    JSContext *quickjs_context = as_context(context_);
+
+    JSValue result = JS_Eval(
+        quickjs_context,
+        source.c_str(),
+        source.size(),
+        name.empty() ? "eval.js" : name.c_str(),
+        JS_EVAL_TYPE_GLOBAL);
+
+    if (JS_IsException(result))
+    {
+      JS_FreeValue(quickjs_context, result);
+      return make_quickjs_failure(quickjs_context);
+    }
+
+    auto value = quickjs_value_to_binding_value(
+        quickjs_context,
+        result);
+
+    JS_FreeValue(quickjs_context, result);
+
+    if (!value)
+    {
+      return ScriptResult::failure(
+          value.error(),
+          1);
+    }
+
+    return ScriptResult::success(
+        value.value());
+#else
+    (void)source;
+    (void)name;
+
+    return ScriptResult::failure(
+        make_binding_error(
+            BindingErrorCode::EngineUnavailable,
+            "QuickJS backend is disabled in this build"),
+        1);
+#endif
+  }
+
+  bool QuickJsBackendDriver::initialized() const noexcept
+  {
+    return runtime_ != nullptr && context_ != nullptr;
+  }
+
+} // namespace kordex::bindings

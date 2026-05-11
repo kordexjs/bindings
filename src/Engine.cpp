@@ -17,6 +17,7 @@
 #include <utility>
 #include <kordex/bindings/Engine.hpp>
 #include <kordex/bindings/backend/NativeBackendDriver.hpp>
+#include <kordex/bindings/backend/QuickJsBackendDriver.hpp>
 
 namespace kordex::bindings
 {
@@ -478,9 +479,14 @@ namespace kordex::bindings
 #endif
 
     case EngineBackend::QuickJS:
+#if defined(KORDEX_BINDINGS_ENABLE_QUICKJS) && KORDEX_BINDINGS_ENABLE_QUICKJS
+      backend_driver_ = std::make_unique<QuickJsBackendDriver>();
+      return ok();
+#else
       return make_binding_error(
           BindingErrorCode::EngineUnavailable,
-          "QuickJS backend is not connected yet");
+          "QuickJS backend is disabled in this build");
+#endif
 
     case EngineBackend::V8:
       return make_binding_error(
