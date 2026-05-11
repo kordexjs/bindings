@@ -21,6 +21,13 @@ option(KORDEX_BINDINGS_BUILD_TESTS "Build Kordex Bindings tests" OFF)
 option(KORDEX_BINDINGS_BUILD_EXAMPLES "Build Kordex Bindings examples" OFF)
 
 # --------------------------------------------------------------------
+# Install options
+# --------------------------------------------------------------------
+option(KORDEX_BINDINGS_ENABLE_INSTALL
+    "Generate install/export rules for Kordex Bindings"
+    OFF)
+
+# --------------------------------------------------------------------
 # Developer options
 # --------------------------------------------------------------------
 option(KORDEX_BINDINGS_ENABLE_WARNINGS "Enable compiler warnings for Kordex Bindings" ON)

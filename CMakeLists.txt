@@ -232,7 +232,8 @@ endif()
 # --------------------------------------------------------------------
 # Install
 # --------------------------------------------------------------------
-if(NOT (DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD))
+if(KORDEX_BINDINGS_ENABLE_INSTALL
+   AND NOT (DEFINED KORDEX_UMBRELLA_BUILD AND KORDEX_UMBRELLA_BUILD))
 
   install(
       TARGETS kordex_bindings
@@ -290,6 +291,7 @@ message(STATUS "  tests        : ${KORDEX_BINDINGS_BUILD_TESTS}")
 message(STATUS "  examples     : ${KORDEX_BINDINGS_BUILD_EXAMPLES}")
 message(STATUS "  warnings     : ${KORDEX_BINDINGS_ENABLE_WARNINGS}")
 message(STATUS "  sanitizers   : ${KORDEX_BINDINGS_ENABLE_SANITIZERS}")
+message(STATUS "  install      : ${KORDEX_BINDINGS_ENABLE_INSTALL}")
 message(STATUS "  native engine: ${KORDEX_BINDINGS_ENABLE_NATIVE_ENGINE}")
 message(STATUS "  quickjs      : ${KORDEX_BINDINGS_ENABLE_QUICKJS}")
 message(STATUS "  v8           : ${KORDEX_BINDINGS_ENABLE_V8}")
