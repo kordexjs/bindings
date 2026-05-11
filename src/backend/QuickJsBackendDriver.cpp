@@ -14,6 +14,7 @@
  *
  */
 
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -39,21 +40,136 @@ namespace kordex::bindings
       return static_cast<JSContext *>(context);
     }
 
-    [[nodiscard]] std::string quickjs_exception_message(JSContext *context)
+    [[nodiscard]] std::string quickjs_cstring_to_string(
+        JSContext *context,
+        JSValue value)
+    {
+      const char *text = JS_ToCString(context, value);
+      if (!text)
+      {
+        return {};
+      }
+
+      std::string result(text);
+      JS_FreeCString(context, text);
+
+      return result;
+    }
+
+    [[nodiscard]] std::string quickjs_property_string(
+        JSContext *context,
+        JSValue object,
+        const char *property_name)
+    {
+      JSValue property = JS_GetPropertyStr(
+          context,
+          object,
+          property_name);
+
+      if (JS_IsException(property))
+      {
+        JSValue exception = JS_GetException(context);
+        JS_FreeValue(context, exception);
+        JS_FreeValue(context, property);
+        return {};
+      }
+
+      if (JS_IsUndefined(property) || JS_IsNull(property))
+      {
+        JS_FreeValue(context, property);
+        return {};
+      }
+
+      std::string result = quickjs_cstring_to_string(
+          context,
+          property);
+
+      JS_FreeValue(context, property);
+
+      return result;
+    }
+
+    [[nodiscard]] std::string quickjs_value_display(
+        JSContext *context,
+        JSValue value)
+    {
+      const char *text = JS_ToCString(context, value);
+      if (!text)
+      {
+        JSValue exception = JS_GetException(context);
+        JS_FreeValue(context, exception);
+        return "JavaScript exception";
+      }
+
+      std::string result(text);
+      JS_FreeCString(context, text);
+
+      return result;
+    }
+
+    [[nodiscard]] std::string quickjs_exception_message(
+        JSContext *context)
     {
       JSValue exception = JS_GetException(context);
 
-      const char *message = JS_ToCString(context, exception);
-      std::string result = message ? message : "JavaScript exception";
-
-      if (message)
+      if (JS_IsUndefined(exception) || JS_IsNull(exception))
       {
-        JS_FreeCString(context, message);
+        JS_FreeValue(context, exception);
+        return "JavaScript exception";
+      }
+
+      const std::string name = quickjs_property_string(
+          context,
+          exception,
+          "name");
+
+      const std::string message = quickjs_property_string(
+          context,
+          exception,
+          "message");
+
+      const std::string stack = quickjs_property_string(
+          context,
+          exception,
+          "stack");
+
+      std::ostringstream stream;
+
+      if (!name.empty() && !message.empty())
+      {
+        stream << name << ": " << message;
+      }
+      else if (!message.empty())
+      {
+        stream << message;
+      }
+      else
+      {
+        stream << quickjs_value_display(context, exception);
+      }
+
+      if (!stack.empty())
+      {
+        const std::string base = stream.str();
+
+        if (stack.find(base) == std::string::npos)
+        {
+          stream << '\n'
+                 << stack;
+        }
+        else
+        {
+          stream.str({});
+          stream.clear();
+          stream << stack;
+        }
       }
 
       JS_FreeValue(context, exception);
 
-      return result;
+      return stream.str().empty()
+                 ? std::string("JavaScript exception")
+                 : stream.str();
     }
 
     [[nodiscard]] Result<std::string> quickjs_value_to_string(
