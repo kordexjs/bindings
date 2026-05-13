@@ -189,20 +189,6 @@ namespace kordex::bindings
           "$1");
 
       /*
-       * Remove "export" from runtime declarations.
-       * Module semantics will be handled later by the module loader.
-       */
-      source = std::regex_replace(
-          source,
-          std::regex(R"(\bexport\s+default\s+)"),
-          "");
-
-      source = std::regex_replace(
-          source,
-          std::regex(R"(\bexport\s+(?=(const|let|var|function|class)\b))"),
-          "");
-
-      /*
        * Remove parameter type annotations:
        *   (name: string)     -> (name)
        *   , age: number      -> , age
