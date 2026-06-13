@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include <kordex/bindings/backend/QuickJsBackendDriver.hpp>
 #include <kordex/bindings/ModuleLoader.hpp>
@@ -269,6 +270,141 @@ namespace kordex::bindings
           result.value());
     }
 
+    void quickjs_write_console_arguments(
+        JSContext *context,
+        int argc,
+        JSValueConst *argv,
+        std::ostream &stream)
+    {
+      for (int index = 0; index < argc; ++index)
+      {
+        if (index > 0)
+        {
+          stream << ' ';
+        }
+
+        const char *text = JS_ToCString(context, argv[index]);
+        if (!text)
+        {
+          JSValue exception = JS_GetException(context);
+          JS_FreeValue(context, exception);
+          stream << "[value]";
+          continue;
+        }
+
+        stream << text;
+        JS_FreeCString(context, text);
+      }
+
+      stream << '\n';
+    }
+
+    [[nodiscard]] JSValue quickjs_console_log(
+        JSContext *context,
+        JSValueConst this_value,
+        int argc,
+        JSValueConst *argv)
+    {
+      (void)this_value;
+
+      quickjs_write_console_arguments(
+          context,
+          argc,
+          argv,
+          std::cout);
+
+      return JS_UNDEFINED;
+    }
+
+    [[nodiscard]] JSValue quickjs_console_error(
+        JSContext *context,
+        JSValueConst this_value,
+        int argc,
+        JSValueConst *argv)
+    {
+      (void)this_value;
+
+      quickjs_write_console_arguments(
+          context,
+          argc,
+          argv,
+          std::cerr);
+
+      return JS_UNDEFINED;
+    }
+
+    [[nodiscard]] Error install_console_global(
+        JSContext *context,
+        JSValue global)
+    {
+      JSValue console = JS_NewObject(context);
+      if (JS_IsException(console))
+      {
+        return make_binding_error(
+            BindingErrorCode::EngineInitializationFailed,
+            quickjs_exception_message(context));
+      }
+
+      JSValue log = JS_NewCFunction(
+          context,
+          quickjs_console_log,
+          "log",
+          1);
+
+      if (JS_IsException(log))
+      {
+        JS_FreeValue(context, console);
+
+        return make_binding_error(
+            BindingErrorCode::EngineInitializationFailed,
+            quickjs_exception_message(context));
+      }
+
+      if (JS_SetPropertyStr(context, console, "log", log) < 0)
+      {
+        JS_FreeValue(context, console);
+
+        return make_binding_error(
+            BindingErrorCode::EngineInitializationFailed,
+            quickjs_exception_message(context));
+      }
+
+      JSValue error = JS_NewCFunction(
+          context,
+          quickjs_console_error,
+          "error",
+          1);
+
+      if (JS_IsException(error))
+      {
+        JS_FreeValue(context, console);
+
+        return make_binding_error(
+            BindingErrorCode::EngineInitializationFailed,
+            quickjs_exception_message(context));
+      }
+
+      if (JS_SetPropertyStr(context, console, "error", error) < 0)
+      {
+        JS_FreeValue(context, console);
+
+        return make_binding_error(
+            BindingErrorCode::EngineInitializationFailed,
+            quickjs_exception_message(context));
+      }
+
+      if (JS_SetPropertyStr(context, global, "console", console) < 0)
+      {
+        JS_FreeValue(context, console);
+
+        return make_binding_error(
+            BindingErrorCode::EngineInitializationFailed,
+            quickjs_exception_message(context));
+      }
+
+      return ok();
+    }
+
     [[nodiscard]] Error install_native_bridge(
         JSContext *context,
         EngineContext &engine_context)
@@ -300,13 +436,24 @@ namespace kordex::bindings
           "__kordex_call_native",
           function);
 
-      JS_FreeValue(context, global);
-
       if (set_result < 0)
       {
+        JS_FreeValue(context, global);
+
         return make_binding_error(
             BindingErrorCode::EngineInitializationFailed,
             quickjs_exception_message(context));
+      }
+
+      const auto console_error = install_console_global(
+          context,
+          global);
+
+      JS_FreeValue(context, global);
+
+      if (console_error)
+      {
+        return console_error;
       }
 
       return ok();

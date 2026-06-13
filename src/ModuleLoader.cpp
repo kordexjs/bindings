@@ -1056,7 +1056,7 @@ namespace kordex::bindings
     output << ");\n";
     output << "if (__kordex_entry && Object.prototype.hasOwnProperty.call(__kordex_entry, 'default')) ";
     output << "return __kordex_entry.default;\n";
-    output << "return __kordex_entry;\n";
+    output << "return undefined;\n";
     output << "})()";
 
     return output.str();
