@@ -68,7 +68,9 @@ namespace kordex::bindings
              name == "kordex:process" ||
              name == "process" ||
              name == "kordex:http" ||
-             name == "http";
+             name == "http" ||
+             name == "kordex:softadastra" ||
+             name == "softadastra";
     }
 
     [[nodiscard]] const char *permission_flag_for_builtin(
@@ -92,6 +94,11 @@ namespace kordex::bindings
       if (name == "kordex:http" || name == "http")
       {
         return "--allow-net";
+      }
+
+      if (name == "kordex:softadastra" || name == "softadastra")
+      {
+        return "--allow-softadastra";
       }
 
       return "";
