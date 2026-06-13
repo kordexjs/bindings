@@ -58,6 +58,56 @@ namespace kordex::bindings
       }
     }
 
+    [[nodiscard]] bool permission_gated_builtin(
+        const std::string &name) noexcept
+    {
+      return name == "kordex:fs" ||
+             name == "fs" ||
+             name == "kordex:env" ||
+             name == "env" ||
+             name == "kordex:process" ||
+             name == "process" ||
+             name == "kordex:http" ||
+             name == "http";
+    }
+
+    [[nodiscard]] const char *permission_flag_for_builtin(
+        const std::string &name) noexcept
+    {
+      if (name == "kordex:fs" || name == "fs")
+      {
+        return "--allow-fs";
+      }
+
+      if (name == "kordex:env" || name == "env")
+      {
+        return "--allow-env";
+      }
+
+      if (name == "kordex:process" || name == "process")
+      {
+        return "--allow-process";
+      }
+
+      if (name == "kordex:http" || name == "http")
+      {
+        return "--allow-net";
+      }
+
+      return "";
+    }
+
+    [[nodiscard]] Error permission_gated_builtin_error(
+        const std::string &specifier)
+    {
+      return make_binding_error(
+          BindingErrorCode::PermissionDenied,
+          "permission denied: module \"" +
+              specifier +
+              "\" requires " +
+              permission_flag_for_builtin(specifier));
+    }
+
     [[nodiscard]] bool is_json_script(
         const Script &script) noexcept
     {
@@ -567,9 +617,15 @@ namespace kordex::bindings
 
     if (!imported)
     {
+      if (permission_gated_builtin(canonical) ||
+          permission_gated_builtin(specifier))
+      {
+        return permission_gated_builtin_error(specifier);
+      }
+
       return make_binding_error(
           BindingErrorCode::ModuleNotFound,
-          std::string(imported.error().message()));
+          "module was not found: " + specifier);
     }
 
     LoadedModule module;
