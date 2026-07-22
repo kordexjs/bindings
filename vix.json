@@ -1,14 +1,18 @@
 {
   "authors": [
     {
-      "github": "softadastra",
-      "name": "Softadastra"
+      "github": "kordexjs",
+      "name": "KordexJS"
+    },
+    {
+      "github": "GaspardKirira",
+      "name": "Gaspard Kirira"
     }
   ],
   "deps": [
     {
-      "id": "softadastra/kordex-runtime",
-      "version": "0.2.0"
+      "id": "kordexjs/runtime",
+      "version": "0.3.0"
     }
   ],
   "description": "Native bindings layer for Kordex, bridging the Kordex runtime with script execution, engine contexts, values, modules, scripts, and runtime integration.",
@@ -20,13 +24,13 @@
     "runtime-bridge",
     "local-first",
     "kordex",
-    "softadastra",
+    "kordexjs",
     "vix"
   ],
   "license": "MIT",
-  "name": "kordex-bindings",
-  "namespace": "softadastra",
-  "repository": "https://github.com/softadastra/kordex-bindings",
+  "name": "bindings",
+  "namespace": "kordexjs",
+  "repository": "https://github.com/kordexjs/bindings",
   "type": "library",
-  "version": "0.2.0"
+  "version": "0.3.0"
 }
