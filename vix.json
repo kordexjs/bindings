@@ -32,5 +32,5 @@
   "namespace": "kordexjs",
   "repository": "https://github.com/kordexjs/bindings",
   "type": "library",
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

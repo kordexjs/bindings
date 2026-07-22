@@ -1,13 +1,15 @@
 {
   "dependencies": [
     {
-      "commit": "d827815bf00bff8db79aaef8f37d9d584ac9dc4c",
-      "hash": "d6a7f5e602f9616662c6b6e8cff2f56608952e9bd235d4bee7d548993c5e1e20",
-      "id": "softadastra/kordex-runtime",
-      "repo": "https://github.com/softadastra/kordex-runtime",
-      "requested": "0.2.0",
-      "tag": "v0.2.0",
-      "version": "0.2.0"
+      "commit": "6dd0a455d3283d8d273d1d9d8c46c3834ebfb8c5",
+      "hash": "75336d458a30f6aa77abfb4c4b8d8f420dce3f5ef25144e9e32ad49b22586c64",
+      "hash_algorithm": "vix-package-sha256",
+      "hash_version": 2,
+      "id": "kordexjs/runtime",
+      "repo": "https://github.com/kordexjs/runtime",
+      "requested": "0.3.0",
+      "tag": "v0.3.0",
+      "version": "0.3.0"
     }
   ],
   "lockVersion": 1
